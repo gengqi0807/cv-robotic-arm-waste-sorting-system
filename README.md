@@ -1,3 +1,5 @@
+# cv-robotic-arm-waste-sorting-system
+
 # 分拣事件保存 API
 
 第一版使用 Flask、PyMySQL 和 MySQL 数据库 `garbage_sorting`。API 只负责分拣事件保存、查询、CSV 导出和统计，不包含前端、人脸、表情或多机协同功能。
