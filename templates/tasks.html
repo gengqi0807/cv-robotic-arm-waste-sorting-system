@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3">
+  <title>任务操作 | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/tasks.js') }}" defer></script>
+</head>
+<body data-page="tasks">
+  <div class="app-shell">
+    <aside class="rail">
+      <a class="brand-mark" href="{{ url_for('records_page') }}" aria-label="智能分拣管理首页">分</a>
+      <div class="rail-label">管理台</div>
+      <nav class="rail-nav" aria-label="主导航">
+        <a class="nav-link" href="{{ url_for('records_page') }}"><span class="nav-icon" aria-hidden="true">▤</span><span>记录查询</span></a>
+        <a class="nav-link" href="{{ url_for('stats_page') }}"><span class="nav-icon" aria-hidden="true">▥</span><span>运营统计</span></a>
+        <a class="nav-link active" href="{{ url_for('tasks_page') }}" aria-current="page"><span class="nav-icon" aria-hidden="true">▷</span><span>任务操作</span></a>
+        <a class="nav-link" href="{{ url_for('monitor_page') }}"><span class="nav-icon" aria-hidden="true">◎</span><span>实时监控</span></a>
+      </nav>
+      <div class="rail-foot"><span class="status-dot"></span>任务控制</div>
+    </aside>
+
+    <main class="main-content">
+      <header class="page-header">
+        <div><p class="eyebrow">分拣管理 / 设备控制</p><h1>任务操作</h1></div>
+        <a class="text-link" href="{{ url_for('monitor_page') }}">查看实时监控 <span aria-hidden="true">→</span></a>
+      </header>
+
+      <section class="mode-strip" aria-label="运行模式">
+        <div class="mode-copy">
+          <span class="mode-pill" id="mode-pill">模拟模式</span>
+          <span id="mode-description">仅演示页面状态，不会向机械臂发送命令。</span>
+        </div>
+        <fieldset class="segmented-control mode-switch">
+          <legend class="visually-hidden">控制模式</legend>
+          <label><input type="radio" name="control-mode" value="mock" checked><span>模拟演示</span></label>
+          <label><input type="radio" name="control-mode" value="live"><span>接口联调</span></label>
+        </fieldset>
+      </section>
+
+      <section class="task-setup-section" aria-label="任务与登录信息">
+        <div class="section-heading"><div><h2>操作员会话</h2><p class="muted">联调模式会将会话信息发送到任务控制接口</p></div><span class="source-badge" id="session-badge">演示身份</span></div>
+        <div class="task-setup-grid">
+          <label class="filter-field"><span>操作员编号</span><input id="operator-id" type="text" value="demo-operator" autocomplete="off"></label>
+          <label class="filter-field"><span>会话编号</span><input id="session-id" type="text" value="demo-session" autocomplete="off"></label>
+          <label class="filter-field"><span>任务模式</span><select id="task-mode"><option value="single">单次分拣</option><option value="continuous">连续分拣</option></select></label>
+        </div>
+      </section>
+
+      <div class="task-columns">
+        <section class="task-control-panel" aria-labelledby="control-title">
+          <div class="section-heading"><div><h2 id="control-title">任务控制</h2><p class="muted">开始或恢复后以设备状态消息为准</p></div></div>
+          <div class="task-buttons">
+            <button class="button button-primary task-command" data-command="start" id="start-task" type="button"><span aria-hidden="true">▶</span> 启动</button>
+            <button class="button button-outline task-command" data-command="pause" id="pause-task" type="button"><span aria-hidden="true">Ⅱ</span> 暂停</button>
+            <button class="button button-outline task-command" data-command="resume" id="resume-task" type="button"><span aria-hidden="true">▷</span> 继续</button>
+            <button class="button button-danger task-command" data-command="finish" id="finish-task" type="button"><span aria-hidden="true">■</span> 结束</button>
+          </div>
+          <p class="safety-note" id="safety-note" role="status">实体急停优先于网页控制。网页命令不能清除急停状态。</p>
+          <p class="error-message" id="task-error" role="alert" hidden></p>
+          <form class="connection-form" id="control-config" hidden>
+            <label class="filter-field"><span>任务控制接口地址</span><input id="control-url" type="url" value="/api/tasks/control" spellcheck="false"></label>
+            <label class="filter-field"><span>状态 WebSocket 地址（可选）</span><input id="control-ws-url" type="url" placeholder="ws://主机:端口/状态路径" spellcheck="false"></label>
+            <button class="button button-outline" id="connect-control-ws" type="button">连接状态流</button>
+            <span class="muted" id="control-ws-state">WebSocket 未连接</span>
+          </form>
+        </section>
+
+        <section class="task-state-panel" aria-labelledby="task-state-title">
+          <div class="section-heading"><div><h2 id="task-state-title">当前状态</h2><p class="muted" id="state-source">本地模拟状态</p></div><span class="state-pill state-idle" id="task-state-pill">空闲</span></div>
+          <dl class="status-list">
+            <div><dt>任务编号</dt><dd id="current-task-id">尚未启动</dd></div>
+            <div><dt>任务状态</dt><dd id="current-task-state">idle</dd></div>
+            <div><dt>机械臂状态</dt><dd id="current-robot-state">空闲</dd></div>
+            <div><dt>最近更新时间</dt><dd id="last-updated">—</dd></div>
+          </dl>
+          <div class="alert-box" id="task-alert" hidden>
+            <strong id="alert-title">设备提示</strong>
+            <p id="alert-message"></p>
+            <span id="alert-code"></span>
+          </div>
+          <div class="estop-notice" id="estop-notice" hidden>
+            <span class="estop-symbol" aria-hidden="true">!</span>
+            <div><strong>急停状态</strong><p>普通网页命令已禁用。请现场检查设备并由人员执行实体检查与人工复位。</p></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="contract-note">
+        <strong>接口状态</strong>
+        <span>当前服务尚未实现 <code>POST /api/tasks/control</code> 和状态 WebSocket。接口联调模式会真实尝试请求，失败时不会回退为模拟成功。</span>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3">
+  <title>实时监控 | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/monitor.js') }}" defer></script>
+</head>
+<body data-page="monitor">
+  <div class="app-shell">
+    <aside class="rail">
+      <a class="brand-mark" href="{{ url_for('records_page') }}" aria-label="智能分拣管理首页">分</a>
+      <div class="rail-label">管理台</div>
+      <nav class="rail-nav" aria-label="主导航">
+        <a class="nav-link" href="{{ url_for('records_page') }}"><span class="nav-icon" aria-hidden="true">▤</span><span>记录查询</span></a>
+        <a class="nav-link" href="{{ url_for('stats_page') }}"><span class="nav-icon" aria-hidden="true">▥</span><span>运营统计</span></a>
+        <a class="nav-link" href="{{ url_for('tasks_page') }}"><span class="nav-icon" aria-hidden="true">▷</span><span>任务操作</span></a>
+        <a class="nav-link active" href="{{ url_for('monitor_page') }}" aria-current="page"><span class="nav-icon" aria-hidden="true">◎</span><span>实时监控</span></a>
+      </nav>
+      <div class="rail-foot"><span class="status-dot"></span>设备监控</div>
+    </aside>
+
+    <main class="main-content">
+      <header class="page-header">
+        <div><p class="eyebrow">分拣管理 / 现场状态</p><h1>实时监控</h1></div>
+        <a class="text-link" href="{{ url_for('tasks_page') }}">前往任务操作 <span aria-hidden="true">→</span></a>
+      </header>
+
+      <section class="mode-strip" aria-label="数据来源">
+        <div class="mode-copy"><span class="mode-pill" id="monitor-mode-pill">模拟数据</span><span id="monitor-mode-description">画面、识别、坐标和执行状态均为本地演示值。</span></div>
+        <fieldset class="segmented-control mode-switch">
+          <legend class="visually-hidden">数据来源</legend>
+          <label><input type="radio" name="monitor-mode" value="mock" checked><span>模拟数据</span></label>
+          <label><input type="radio" name="monitor-mode" value="live"><span>接口联调</span></label>
+        </fieldset>
+      </section>
+
+      <section class="monitor-connection" id="monitor-connection" hidden>
+        <label class="filter-field"><span>状态 WebSocket 地址</span><input id="monitor-ws-url" type="url" placeholder="ws://主机:端口/状态路径" spellcheck="false"></label>
+        <button class="button button-outline" id="connect-monitor" type="button">连接状态流</button>
+        <span id="monitor-ws-state" class="muted">未连接</span>
+        <label class="filter-field image-url-field"><span>最近图片地址（可选）</span><input id="monitor-image-url" type="url" placeholder="http(s)://…/latest.jpg" spellcheck="false"></label>
+        <button class="button button-quiet" id="load-monitor-image" type="button">加载图片</button>
+      </section>
+
+      <div class="monitor-grid">
+        <section class="camera-section" aria-labelledby="camera-title">
+          <div class="section-heading">
+            <div><h2 id="camera-title">相机画面</h2><p class="muted" id="camera-caption">模拟工作台画面 · 非真实相机视频</p></div>
+            <span class="source-badge" id="camera-source">模拟画面</span>
+          </div>
+          <div class="camera-frame" id="camera-frame">
+            <div class="camera-topline"><span><i class="live-dot"></i><span id="camera-live-label">演示帧</span></span><span id="camera-timestamp">—</span></div>
+            <div class="camera-scene" id="camera-scene" aria-label="由 CSS 绘制的模拟工作台与识别目标">
+              <div class="scene-backline"></div>
+              <div class="scene-grid"></div>
+              <div class="scene-target-box"><span>目标框 · 模拟</span></div>
+              <div class="scene-object"><span></span></div>
+              <div class="scene-crosshair" aria-hidden="true">+</div>
+              <div class="scene-coordinate" id="scene-coordinate">u: 320 px&nbsp;&nbsp; v: 240 px</div>
+            </div>
+            <img id="camera-image" alt="最近相机画面" hidden>
+            <div class="camera-footer"><span>画面来源：<b id="camera-source-detail">CSS 模拟场景</b></span><span id="frame-id">frame_demo_001</span></div>
+          </div>
+        </section>
+
+        <section class="robot-state-section" aria-labelledby="robot-title">
+          <div class="section-heading"><div><h2 id="robot-title">机械臂状态</h2><p class="muted">状态与告警</p></div><span class="state-pill state-running" id="robot-state-pill">运行</span></div>
+          <dl class="status-list">
+            <div><dt>设备状态</dt><dd id="robot-state-text">运行</dd></div>
+            <div><dt>问题编号</dt><dd id="robot-code">—</dd></div>
+            <div><dt>是否可恢复</dt><dd id="robot-recoverable">是</dd></div>
+            <div><dt>更新时间</dt><dd id="robot-updated">—</dd></div>
+          </dl>
+          <div class="alert-box alert-box-quiet" id="robot-message"><strong>设备提示</strong><p>模拟分拣流程运行中。</p></div>
+        </section>
+
+        <section class="vision-section" aria-labelledby="vision-title">
+          <div class="section-heading"><div><h2 id="vision-title">视觉识别</h2><p class="muted">识别类别、像素位置与可信度</p></div><span class="source-badge" id="detect-source">模拟 detect</span></div>
+          <dl class="status-list status-list-wide">
+            <div><dt>类别</dt><dd id="detected-class">可回收物</dd></div>
+            <div><dt>识别可信度</dt><dd id="detected-confidence">0.93</dd></div>
+            <div><dt>图像位置（u, v）</dt><dd id="detected-pixel">320 px, 240 px</dd></div>
+            <div><dt>目标框（像素）</dt><dd id="detected-box">[250, 180, 390, 300]</dd></div>
+            <div><dt>图片编号</dt><dd id="detected-frame">frame_demo_001</dd></div>
+            <div><dt>识别耗时</dt><dd id="detected-duration">42 ms</dd></div>
+          </dl>
+        </section>
+
+        <section class="motion-section" aria-labelledby="motion-title">
+          <div class="section-heading"><div><h2 id="motion-title">坐标与执行</h2><p class="muted">机械臂 base 坐标系，单位米</p></div><span class="source-badge" id="motion-source">模拟接口值</span></div>
+          <dl class="status-list status-list-wide">
+            <div><dt>目标坐标（x, y, z）</dt><dd id="target-position">0.120 m, 0.230 m, 0.040 m</dd></div>
+            <div><dt>可达性</dt><dd id="target-reachable">可达</dd></div>
+            <div><dt>校准版本</dt><dd id="target-calibration">calibration_demo</dd></div>
+            <div><dt>执行接受</dt><dd id="execute-accepted">是</dd></div>
+            <div><dt>执行结果</dt><dd id="execute-result">运行中</dd></div>
+            <div><dt>执行耗时</dt><dd id="execute-duration">—</dd></div>
+          </dl>
+          <p id="monitor-error" class="error-message" role="alert" hidden></p>
+        </section>
+      </div>
+
+      <section class="contract-note">
+        <strong>接口状态</strong>
+        <span><code>detect</code>、<code>transform</code>、<code>execute_pick</code> 和状态/告警的设备端接口尚未接入。真实模式仅接受配置的 WebSocket 适配消息；没有连接时页面不会伪装成实时数据。</span>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

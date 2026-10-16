@@ -1,0 +1,51 @@
+# Python cache and native extensions
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables and secrets
+.env
+*.env
+
+# Database configuration (keep the example template)
+db/config.ini
+*.ini
+!config.example.ini
+!db/config.example.ini
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Temporary test files
+*.tmp
+temp/
+
+# Model files
+*.h5
+*.pt
+*.pth
+*.onnx
+
+# CSV exports
+*.csv

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3">
+  <title>分拣记录 | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/records.js') }}" defer></script>
+</head>
+<body data-page="records">
+  <div class="app-shell">
+    <aside class="rail">
+      <a class="brand-mark" href="{{ url_for('records_page') }}" aria-label="智能分拣管理首页">分</a>
+      <div class="rail-label">管理台</div>
+      <nav class="rail-nav" aria-label="主导航">
+        <a class="nav-link active" href="{{ url_for('records_page') }}" aria-current="page">
+          <span class="nav-icon" aria-hidden="true">▤</span><span>记录查询</span>
+        </a>
+        <a class="nav-link" href="{{ url_for('stats_page') }}">
+          <span class="nav-icon" aria-hidden="true">▥</span><span>运营统计</span>
+        </a>
+        <a class="nav-link" href="{{ url_for('tasks_page') }}">
+          <span class="nav-icon" aria-hidden="true">▷</span><span>任务操作</span>
+        </a>
+        <a class="nav-link" href="{{ url_for('monitor_page') }}">
+          <span class="nav-icon" aria-hidden="true">◎</span><span>实时监控</span>
+        </a>
+      </nav>
+      <div class="rail-foot"><span class="status-dot"></span>系统记录</div>
+    </aside>
+
+    <main class="main-content">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">分拣管理 / 数据追溯</p>
+          <h1>记录查询</h1>
+        </div>
+        <a class="text-link" href="{{ url_for('stats_page') }}">查看运营统计 <span aria-hidden="true">→</span></a>
+      </header>
+
+      <section class="filter-bar" aria-label="记录筛选">
+        <label class="filter-field">
+          <span>日期</span>
+          <input id="filter-date" type="date">
+        </label>
+        <label class="filter-field">
+          <span>垃圾类别</span>
+          <select id="filter-class">
+            <option value="">全部类别</option>
+            <option value="recyclable">可回收物</option>
+            <option value="kitchen">厨余垃圾</option>
+            <option value="hazardous">有害垃圾</option>
+            <option value="other">其他垃圾</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>分拣结果</span>
+          <select id="filter-result">
+            <option value="">全部结果</option>
+            <option value="success">成功</option>
+            <option value="failed">失败</option>
+          </select>
+        </label>
+        <button class="button button-primary" id="apply-filters" type="button">
+          <span aria-hidden="true">⌕</span> 查询
+        </button>
+        <button class="button button-quiet" id="reset-filters" type="button">重置</button>
+      </section>
+
+      <section class="data-section" aria-labelledby="records-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="records-title">分拣明细</h2>
+            <p id="records-count" class="muted">正在读取记录…</p>
+          </div>
+          <div class="table-actions">
+            <label class="compact-select"><span class="visually-hidden">每页条数</span>
+              <select id="page-size" aria-label="每页条数">
+                <option value="50">每页 50 条</option>
+                <option value="100">每页 100 条</option>
+              </select>
+            </label>
+            <button class="button button-outline" id="export-csv" type="button">
+              <span aria-hidden="true">↓</span> 导出 CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="records-table">
+            <thead>
+              <tr>
+                <th scope="col">时间</th>
+                <th scope="col">类别</th>
+                <th scope="col">可信度</th>
+                <th scope="col">图像位置</th>
+                <th scope="col">机械臂位置</th>
+                <th scope="col">结果</th>
+                <th scope="col">耗时</th>
+                <th scope="col"><span class="visually-hidden">操作</span></th>
+              </tr>
+            </thead>
+            <tbody id="records-body">
+              <tr><td class="table-message" colspan="8">正在读取记录…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-footer">
+          <span id="page-summary" class="muted">第 1 页</span>
+          <div class="pagination-controls">
+            <button class="icon-button" id="previous-page" type="button" aria-label="上一页" disabled>←</button>
+            <span id="page-indicator" class="page-indicator">1 / 1</span>
+            <button class="icon-button" id="next-page" type="button" aria-label="下一页" disabled>→</button>
+          </div>
+        </div>
+        <p id="records-error" class="error-message" role="alert" hidden></p>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="detail-dialog" id="event-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-header">
+      <div><p class="eyebrow">事件详情</p><h2 id="dialog-title">分拣记录</h2></div>
+      <button class="icon-button dialog-close" id="close-dialog" type="button" aria-label="关闭详情">×</button>
+    </div>
+    <dl class="detail-grid" id="event-details"></dl>
+  </dialog>
+</body>
+</html>
