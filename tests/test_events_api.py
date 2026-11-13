@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 import unittest
 from typing import Any
 
@@ -128,7 +129,9 @@ def make_event(event_id: str, timestamp_ms: int = 1000, **overrides: Any) -> dic
 class EventsApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.database = FakeDatabase()
-        self.client = create_app({"TESTING": True}, self.database.connect).test_client()
+        self.client = create_app(
+            {"TESTING": True, "ROBOT_BRIDGE_TOKEN": "test-token"}, self.database.connect
+        ).test_client()
 
     def test_duplicate_event_id_is_idempotent(self) -> None:
         event = make_event("event-001")
@@ -198,8 +201,35 @@ class EventsApiTests(unittest.TestCase):
 
         self.assertEqual(task_page.status_code, 200)
         self.assertIn("/api/tasks/control", task_page.get_data(as_text=True))
+        self.assertIn('value="live" checked', task_page.get_data(as_text=True))
         self.assertEqual(monitor_page.status_code, 200)
         self.assertIn("模拟数据", monitor_page.get_data(as_text=True))
+
+    def test_start_command_is_queued_for_online_robot(self) -> None:
+        app = self.client.application
+        bridge = app.extensions["robot_bridge"]
+        bridge["last_seen_monotonic"] = time.monotonic()
+        response = self.client.post(
+            "/api/tasks/control",
+            json={
+                "command": "start",
+                "task_mode": "continuous",
+                "operator_id": "operator-1",
+                "session_id": "session-1",
+                "request_id": "request-1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["accepted"])
+        self.assertEqual(response.json["task_state"], "running")
+
+        polled = self.client.get(
+            "/api/robot/poll?after_seq=0",
+            headers={"Authorization": "Bearer test-token"},
+        )
+        self.assertEqual(polled.status_code, 200)
+        self.assertEqual(polled.json["commands"][0]["command"], "start")
 
 
 if __name__ == "__main__":

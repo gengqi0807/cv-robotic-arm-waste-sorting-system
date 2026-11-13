@@ -30,13 +30,13 @@
 
       <section class="mode-strip" aria-label="运行模式">
         <div class="mode-copy">
-          <span class="mode-pill" id="mode-pill">模拟模式</span>
-          <span id="mode-description">仅演示页面状态，不会向机械臂发送命令。</span>
+          <span class="mode-pill live" id="mode-pill">接口联调</span>
+          <span id="mode-description">任务命令将发送到在线机械臂；启动分拣仍需点击“启动”。</span>
         </div>
         <fieldset class="segmented-control mode-switch">
           <legend class="visually-hidden">控制模式</legend>
-          <label><input type="radio" name="control-mode" value="mock" checked><span>模拟演示</span></label>
-          <label><input type="radio" name="control-mode" value="live"><span>接口联调</span></label>
+          <label><input type="radio" name="control-mode" value="mock"><span>模拟演示</span></label>
+          <label><input type="radio" name="control-mode" value="live" checked><span>接口联调</span></label>
         </fieldset>
       </section>
 
@@ -60,7 +60,7 @@
           </div>
           <p class="safety-note" id="safety-note" role="status">实体急停优先于网页控制。网页命令不能清除急停状态。</p>
           <p class="error-message" id="task-error" role="alert" hidden></p>
-          <form class="connection-form" id="control-config" hidden>
+          <form class="connection-form" id="control-config">
             <label class="filter-field"><span>任务控制接口地址</span><input id="control-url" type="url" value="/api/tasks/control" spellcheck="false"></label>
             <span class="muted">状态通过当前页面的 HTTP 接口每秒轮询。</span>
           </form>
@@ -88,7 +88,7 @@
 
       <section class="contract-note">
         <strong>接口状态</strong>
-        <span>接口联调模式通过 <code>POST /api/tasks/control</code> 控制，并轮询 <code>GET /api/tasks/state</code>；机械臂在线后才接受启动。</span>
+        <span>接口联调通过 <code>POST /api/tasks/control</code> 控制，并轮询 <code>GET /api/tasks/state</code>；机械臂在线后才接受启动。模拟演示不会驱动设备。</span>
       </section>
     </main>
   </div>

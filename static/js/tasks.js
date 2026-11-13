@@ -39,7 +39,7 @@ const elements = {
   error: document.querySelector("#task-error"),
 };
 
-let controlMode = "mock";
+let controlMode = "live";
 let currentTaskId = "";
 let taskState = "idle";
 let robotState = "idle";
@@ -164,7 +164,7 @@ async function sendCommand(command) {
     }, "任务控制接口响应");
     elements.stateSource.textContent = "等待机械臂状态确认";
   } catch (error) {
-    elements.error.textContent = `${error.message}。当前服务尚未接入任务控制接口；页面未模拟成功。`;
+    elements.error.textContent = `${error.message}。命令未发送成功，机械臂没有启动。`;
     elements.error.hidden = false;
     updateButtons();
   }
@@ -192,7 +192,7 @@ document.querySelectorAll('input[name="control-mode"]').forEach((input) => {
     elements.modePill.textContent = live ? "接口联调" : "模拟模式";
     elements.modePill.classList.toggle("live", live);
     elements.modeDescription.textContent = live
-      ? "命令会请求配置的任务控制地址；当前服务未实现该接口，失败不会伪装成功。"
+      ? "任务命令将发送到在线机械臂；启动分拣仍需点击“启动”。"
       : "仅演示页面状态，不会向机械臂发送命令。";
     elements.sessionBadge.textContent = live ? "需有效操作员会话" : "演示身份";
     elements.controlConfig.hidden = !live;
@@ -214,3 +214,4 @@ document.querySelectorAll(".task-command").forEach((button) => {
   button.addEventListener("click", () => sendCommand(button.dataset.command));
 });
 applyState({ task_state: "idle", robot_state: "idle", timestamp_ms: Date.now() }, "本地模拟状态");
+document.querySelector('input[name="control-mode"][value="live"]').dispatchEvent(new Event("change", { bubbles: true }));
