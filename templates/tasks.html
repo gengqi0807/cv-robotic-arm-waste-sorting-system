@@ -62,9 +62,7 @@
           <p class="error-message" id="task-error" role="alert" hidden></p>
           <form class="connection-form" id="control-config" hidden>
             <label class="filter-field"><span>任务控制接口地址</span><input id="control-url" type="url" value="/api/tasks/control" spellcheck="false"></label>
-            <label class="filter-field"><span>状态 WebSocket 地址（可选）</span><input id="control-ws-url" type="url" placeholder="ws://主机:端口/状态路径" spellcheck="false"></label>
-            <button class="button button-outline" id="connect-control-ws" type="button">连接状态流</button>
-            <span class="muted" id="control-ws-state">WebSocket 未连接</span>
+            <span class="muted">状态通过当前页面的 HTTP 接口每秒轮询。</span>
           </form>
         </section>
 
@@ -90,7 +88,7 @@
 
       <section class="contract-note">
         <strong>接口状态</strong>
-        <span>当前服务尚未实现 <code>POST /api/tasks/control</code> 和状态 WebSocket。接口联调模式会真实尝试请求，失败时不会回退为模拟成功。</span>
+        <span>接口联调模式通过 <code>POST /api/tasks/control</code> 控制，并轮询 <code>GET /api/tasks/state</code>；机械臂在线后才接受启动。</span>
       </section>
     </main>
   </div>

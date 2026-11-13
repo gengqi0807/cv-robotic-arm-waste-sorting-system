@@ -35,6 +35,8 @@ const elements = {
 
 let monitorMode = "mock";
 let monitorSocket = null;
+let monitorPollTimer = null;
+let framePollTimer = null;
 let demoFrame = 1;
 
 function localTime(timestampMs = Date.now()) {
@@ -144,6 +146,63 @@ function mockTick() {
   elements.cameraTimestamp.textContent = localTime(timestamp);
 }
 
+function clearLiveData() {
+  document.querySelector("#detected-class").textContent = "暂无设备识别";
+  document.querySelector("#detected-confidence").textContent = "—";
+  document.querySelector("#detected-pixel").textContent = "—";
+  document.querySelector("#detected-box").textContent = "—";
+  document.querySelector("#detected-frame").textContent = "—";
+  document.querySelector("#detected-duration").textContent = "—";
+  document.querySelector("#target-position").textContent = "—";
+  document.querySelector("#target-reachable").textContent = "—";
+  document.querySelector("#target-calibration").textContent = "—";
+  document.querySelector("#execute-accepted").textContent = "—";
+  document.querySelector("#execute-result").textContent = "—";
+  document.querySelector("#execute-duration").textContent = "—";
+  elements.detectSource.textContent = "暂无视觉数据";
+  elements.motionSource.textContent = "暂无执行数据";
+  elements.cameraLiveLabel.textContent = "无视频流";
+  elements.cameraSource.textContent = "无相机视频";
+  elements.cameraSourceDetail.textContent = "等待机械臂上传 JPEG 帧";
+  elements.cameraCaption.textContent = "连接后显示机械臂端实时上传画面";
+}
+
+async function pollMonitorState() {
+  if (monitorMode !== "live") return;
+  try {
+    const response = await fetch("/api/tasks/state", { headers: { Accept: "application/json" } });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || `状态查询失败（HTTP ${response.status}）`);
+    updateRobotState({ robot_state: body.robot_state, message: body.message, timestamp_ms: body.timestamp_ms, recoverable: body.robot_state !== "fault" });
+    if (body.detections && body.detections.length) updateDetection({ detections: body.detections }, "机械臂状态");
+    elements.error.hidden = true;
+  } catch (error) {
+    elements.error.textContent = `状态查询失败：${error.message}`;
+    elements.error.hidden = false;
+  }
+}
+
+async function pollRobotFrame() {
+  if (monitorMode !== "live") return;
+  const response = await fetch(`/api/robot/frame?t=${Date.now()}`, { cache: "no-store" });
+  if (response.status === 204) return;
+  if (!response.ok) throw new Error(`视频帧读取失败（HTTP ${response.status}）`);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const previousUrl = elements.image.dataset.objectUrl;
+  elements.image.src = objectUrl;
+  elements.image.dataset.objectUrl = objectUrl;
+  elements.image.hidden = false;
+  elements.scene.hidden = true;
+  if (previousUrl) URL.revokeObjectURL(previousUrl);
+  elements.cameraLiveLabel.textContent = "实时画面";
+  elements.cameraSource.textContent = "机械臂相机";
+  elements.cameraSourceDetail.textContent = "HTTP JPEG 帧";
+  elements.cameraCaption.textContent = "机械臂端实时上传画面";
+  elements.cameraTimestamp.textContent = localTime(response.headers.get("X-Frame-Timestamp-Ms") || Date.now());
+  elements.frameId.textContent = response.headers.get("X-Frame-Id") || "—";
+}
+
 function connectSocket() {
   const address = elements.wsUrl.value.trim();
   if (!address) {
@@ -198,9 +257,23 @@ document.querySelectorAll('input[name="monitor-mode"]').forEach((input) => {
     elements.modePill.textContent = live ? "接口联调" : "模拟数据";
     elements.modePill.classList.toggle("live", live);
     elements.modeDescription.textContent = live
-      ? "模拟刷新已停止；等待真实消息或配置的最近图片。"
+      ? "通过 HTTP 轮询机械臂状态，并读取机械臂端上传的最新 JPEG 帧。"
       : "画面、识别、坐标和执行状态均为本地演示值。";
     elements.connection.hidden = !live;
+    if (live) {
+      clearLiveData();
+      pollMonitorState();
+      pollRobotFrame().catch((error) => { elements.error.textContent = `视频帧读取失败：${error.message}`; elements.error.hidden = false; });
+      if (!monitorPollTimer) monitorPollTimer = window.setInterval(pollMonitorState, 1000);
+      if (!framePollTimer) framePollTimer = window.setInterval(() => pollRobotFrame().catch(() => {}), 500);
+    } else if (monitorPollTimer) {
+      window.clearInterval(monitorPollTimer);
+      monitorPollTimer = null;
+    }
+    if (!live && framePollTimer) {
+      window.clearInterval(framePollTimer);
+      framePollTimer = null;
+    }
     if (!live) {
       if (monitorSocket) monitorSocket.close();
       monitorSocket = null;

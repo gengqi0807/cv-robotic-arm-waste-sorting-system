@@ -24,8 +24,6 @@ const elements = {
   taskMode: document.querySelector("#task-mode"),
   controlConfig: document.querySelector("#control-config"),
   controlUrl: document.querySelector("#control-url"),
-  wsUrl: document.querySelector("#control-ws-url"),
-  wsState: document.querySelector("#control-ws-state"),
   stateSource: document.querySelector("#state-source"),
   statePill: document.querySelector("#task-state-pill"),
   taskId: document.querySelector("#current-task-id"),
@@ -46,6 +44,7 @@ let currentTaskId = "";
 let taskState = "idle";
 let robotState = "idle";
 let stateSocket = null;
+let statePollTimer = null;
 
 function localTime(timestampMs = Date.now()) {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -163,7 +162,7 @@ async function sendCommand(command) {
       timestamp_ms: body.timestamp_ms,
       message: body.message,
     }, "任务控制接口响应");
-    elements.stateSource.textContent = "等待机械臂状态 WebSocket 确认";
+    elements.stateSource.textContent = "等待机械臂状态确认";
   } catch (error) {
     elements.error.textContent = `${error.message}。当前服务尚未接入任务控制接口；页面未模拟成功。`;
     elements.error.hidden = false;
@@ -171,29 +170,17 @@ async function sendCommand(command) {
   }
 }
 
-function connectStateSocket() {
-  const address = elements.wsUrl.value.trim();
-  if (!address) {
-    elements.wsState.textContent = "请填写 WebSocket 地址。";
-    return;
-  }
-  if (stateSocket) stateSocket.close();
-  elements.wsState.textContent = "正在连接…";
+async function pollTaskState() {
+  if (controlMode !== "live") return;
   try {
-    stateSocket = new WebSocket(address);
-    stateSocket.addEventListener("open", () => { elements.wsState.textContent = "状态流已连接"; });
-    stateSocket.addEventListener("message", (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        applyState(message.data || message, "WebSocket 实时状态");
-      } catch {
-        elements.wsState.textContent = "状态消息不是有效 JSON。";
-      }
-    });
-    stateSocket.addEventListener("close", () => { elements.wsState.textContent = "状态流已断开"; });
-    stateSocket.addEventListener("error", () => { elements.wsState.textContent = "连接失败，请检查地址和服务端适配。"; });
+    const response = await fetch("/api/tasks/state", { headers: { Accept: "application/json" } });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || `状态查询失败（HTTP ${response.status}）`);
+    applyState(body, "HTTP 任务状态轮询");
+    elements.error.hidden = true;
   } catch (error) {
-    elements.wsState.textContent = `连接失败：${error.message}`;
+    elements.error.textContent = `状态查询失败：${error.message}`;
+    elements.error.hidden = false;
   }
 }
 
@@ -209,16 +196,21 @@ document.querySelectorAll('input[name="control-mode"]').forEach((input) => {
       : "仅演示页面状态，不会向机械臂发送命令。";
     elements.sessionBadge.textContent = live ? "需有效操作员会话" : "演示身份";
     elements.controlConfig.hidden = !live;
-    elements.stateSource.textContent = live ? "等待任务接口或 WebSocket 消息" : "本地模拟状态";
+    elements.stateSource.textContent = live ? "等待机械臂 HTTP 状态" : "本地模拟状态";
+    if (live) {
+      pollTaskState();
+      if (!statePollTimer) statePollTimer = window.setInterval(pollTaskState, 1000);
+    } else if (statePollTimer) {
+      window.clearInterval(statePollTimer);
+      statePollTimer = null;
+    }
     if (!live && stateSocket) {
       stateSocket.close();
       stateSocket = null;
-      elements.wsState.textContent = "WebSocket 未连接";
     }
   });
 });
 document.querySelectorAll(".task-command").forEach((button) => {
   button.addEventListener("click", () => sendCommand(button.dataset.command));
 });
-document.querySelector("#connect-control-ws").addEventListener("click", connectStateSocket);
 applyState({ task_state: "idle", robot_state: "idle", timestamp_ms: Date.now() }, "本地模拟状态");

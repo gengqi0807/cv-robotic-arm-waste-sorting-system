@@ -16,6 +16,16 @@ Copy-Item db\config.example.ini db\config.ini
 
 `ssl_disabled` 默认 `auto`：仅当 MySQL 主机为本机 loopback（`127.0.0.1`、`localhost` 或 `::1`）时关闭 TLS 握手以减少本机延迟；远程数据库默认不关闭 TLS。可在配置文件或用 `MYSQL_SSL_DISABLED=true/false` 显式覆盖。
 
+机械臂联调时，在 Flask 服务端和 `RobotArm-a` 运行环境设置同一个随机令牌，并让机械臂端能访问 Flask 主机：
+
+```powershell
+$env:ROBOT_BRIDGE_TOKEN = "替换为随机长令牌"
+# 机械臂端还需设置 Flask 地址
+$env:ROBOT_BRIDGE_URL = "http://Flask主机:5000"
+```
+
+机械臂端通过 `POST /api/robot/connect` 注册、轮询 `GET /api/robot/poll` 获取任务命令，并通过 `POST /api/robot/status` 上报心跳和状态；识别循环通过 `POST /api/robot/frame` 上传最新 JPEG 帧，监控页通过 `GET /api/robot/frame` 获取。网页任务页调用 `POST /api/tasks/control`，只有设备心跳在线时才接受启动；监控页通过 `GET /api/tasks/state` 轮询状态。
+
 ```powershell
 .venv\Scripts\python.exe app.py
 ```
@@ -36,7 +46,7 @@ Copy-Item db\config.example.ini db\config.ini
 
 手动验收时，可先在数据库插入测试事件，然后逐项检查：记录筛选和分页、详情字段、CSV 文件列头、统计总数和四类占比，以及窄屏下筛选控件和表格横向滚动。此阶段仅包含记录查询和运营统计，不包含任务操作与实时监控。
 
-任务操作页默认模拟模式，可体验单次/连续模式选择和启动、暂停、继续、结束状态流转；只有切到“接口联调”才会 POST JSON 到 `/api/tasks/control`。当前 Flask 服务尚未实现任务控制 API 或状态 WebSocket，联调失败不会显示模拟成功。监控页默认模拟数据，会明确标记 CSS 画面与模拟 `detect`/坐标/执行/状态；接口联调模式需填写状态 WebSocket 地址，接收 `{ "type": "detect|transform|execute_pick|status", "data": { ... } }` 消息。该 WebSocket 消息包络是前端适配格式，不是已上线的设备端契约。也可填写最近图片 URL 显示静态图片；当前没有真实相机视频接口。
+任务操作页默认模拟模式；切到“接口联调”后会调用 `/api/tasks/control` 并轮询 `/api/tasks/state`。监控页默认模拟数据，接口联调模式只展示桥接上报的设备状态；当前没有真实相机视频接口。
 
 ## 接口
 

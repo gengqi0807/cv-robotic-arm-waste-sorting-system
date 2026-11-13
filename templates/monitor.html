@@ -105,7 +105,7 @@
 
       <section class="contract-note">
         <strong>接口状态</strong>
-        <span><code>detect</code>、<code>transform</code>、<code>execute_pick</code> 和状态/告警的设备端接口尚未接入。真实模式仅接受配置的 WebSocket 适配消息；没有连接时页面不会伪装成实时数据。</span>
+        <span>接口联调模式通过 <code>GET /api/tasks/state</code> 轮询机械臂状态，并通过 <code>GET /api/robot/frame</code> 显示机械臂端上传的最新 JPEG 帧。</span>
       </section>
     </main>
   </div>

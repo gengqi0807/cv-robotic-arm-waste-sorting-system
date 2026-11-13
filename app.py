@@ -7,10 +7,34 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 import io
 import math
+import os
+import hmac
+import threading
+import time as monotonic_time
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
 from werkzeug.exceptions import HTTPException
+
+
+def load_local_env() -> None:
+    """Load simple KEY=VALUE settings from the ignored local .env file."""
+    env_path = Path(__file__).with_name(".env")
+    if not env_path.is_file():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key, value = key.strip(), value.strip().strip("\"'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+load_local_env()
 
 from database import get_connection, load_db_config
 
@@ -36,6 +60,8 @@ CLASS_IDS = {"recyclable", "kitchen", "hazardous", "other"}
 MAX_RECENT_EVENTS = 500
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
+TASK_STATES = {"idle", "running", "paused", "finished", "fault", "estop"}
+ROBOT_STATES = {"idle", "running", "paused", "fault", "estop"}
 
 
 class RequestError(ValueError):
@@ -169,12 +195,67 @@ def create_app(
 ) -> Flask:
     app = Flask(__name__)
     app.config.update(test_config or {})
+    app.config.setdefault("ROBOT_BRIDGE_TOKEN", os.environ.get("ROBOT_BRIDGE_TOKEN", ""))
+    bridge_lock = threading.RLock()
+    bridge = {
+        "task_id": None,
+        "task_state": "idle",
+        "robot_state": "idle",
+        "updated_at_ms": None,
+        "last_seen_monotonic": None,
+        "message": "等待机械臂连接。",
+        "detections": [],
+        "is_busy": False,
+        "last_command_seq": 0,
+        "latest_frame": None,
+        "latest_frame_id": None,
+        "latest_frame_timestamp_ms": None,
+        "commands": [],
+    }
+    app.extensions["robot_bridge"] = bridge
+    app.extensions["robot_bridge_lock"] = bridge_lock
     if connection_factory is None:
         db_config = load_db_config(app.config.get("DB_CONFIG_PATH"))
         connection_factory = lambda: get_connection(db_config)
 
     def open_connection() -> Any:
         return connection_factory()
+
+    def bridge_snapshot() -> dict[str, Any]:
+        with bridge_lock:
+            online = (
+                bridge["last_seen_monotonic"] is not None
+                and monotonic_time.monotonic() - bridge["last_seen_monotonic"] <= 5
+            )
+            return {
+                "task_id": bridge["task_id"],
+                "task_state": bridge["task_state"],
+                "robot_state": bridge["robot_state"] if online else "idle",
+                "device_online": online,
+                "timestamp_ms": bridge["updated_at_ms"],
+                "message": bridge["message"] if online else "机械臂未连接或心跳超时。",
+                "detections": list(bridge["detections"]),
+                "is_busy": bool(bridge["is_busy"]),
+                "last_command_seq": bridge["last_command_seq"],
+            }
+
+    def require_robot_token() -> tuple[Any, int] | None:
+        configured_token = app.config.get("ROBOT_BRIDGE_TOKEN")
+        if not isinstance(configured_token, str) or not configured_token:
+            return jsonify({"error": "服务端未配置 ROBOT_BRIDGE_TOKEN。"}), 503
+        supplied = request.headers.get("Authorization", "")
+        expected = f"Bearer {configured_token}"
+        if not hmac.compare_digest(supplied, expected):
+            return jsonify({"error": "设备认证失败。"}), 401
+        return None
+
+    def require_same_origin() -> tuple[Any, int] | None:
+        origin = request.headers.get("Origin")
+        if origin:
+            expected_origin = request.host_url.rstrip("/")
+            if not hmac.compare_digest(origin.rstrip("/"), expected_origin):
+                return jsonify({"error": "跨来源任务控制请求已拒绝。"}), 403
+        return None
 
     @app.get("/")
     def home_page() -> Response:
@@ -195,6 +276,162 @@ def create_app(
     @app.get("/monitor")
     def monitor_page() -> str:
         return render_template("monitor.html")
+
+    @app.post("/api/tasks/control")
+    def control_task() -> tuple[Any, int] | Any:
+        origin_error = require_same_origin()
+        if origin_error:
+            return origin_error
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            raise RequestError("请求体必须是 JSON 对象。")
+        command = payload.get("command")
+        if command not in {"start", "pause", "resume", "finish"}:
+            raise RequestError("command 必须是 start、pause、resume 或 finish。")
+        for field, max_length in (("operator_id", 64), ("session_id", 64), ("request_id", 64)):
+            value = payload.get(field)
+            if not isinstance(value, str) or not value.strip() or len(value) > max_length:
+                raise RequestError(f"字段 {field} 必须是1到{max_length}个字符的非空字符串。")
+        if payload.get("task_mode") not in {"single", "continuous"}:
+            raise RequestError("task_mode 必须是 single 或 continuous。")
+
+        with bridge_lock:
+            online = (
+                bridge["last_seen_monotonic"] is not None
+                and monotonic_time.monotonic() - bridge["last_seen_monotonic"] <= 5
+            )
+            if not online:
+                return jsonify({"accepted": False, "reason_code": "ROBOT_OFFLINE", "message": "机械臂未在线，未发送任务命令。"}), 409
+            state = bridge["task_state"]
+            allowed = {
+                "start": {"idle", "finished"},
+                "pause": {"running"},
+                "resume": {"paused"},
+                "finish": {"running", "paused"},
+            }
+            if state not in allowed[command]:
+                return jsonify({"accepted": False, "reason_code": "INVALID_TRANSITION", "message": f"当前状态 {state} 不允许执行 {command}。"}), 409
+            task_id = uuid4().hex if command == "start" else bridge["task_id"]
+            next_state = {"start": "running", "pause": "paused", "resume": "running", "finish": "finished"}[command]
+            bridge["last_command_seq"] += 1
+            queued = {
+                "seq": bridge["last_command_seq"],
+                "command": command,
+                "task_id": task_id,
+                "task_mode": payload["task_mode"],
+                "created_at_ms": int(monotonic_time.time() * 1000),
+            }
+            bridge["commands"].append(queued)
+            bridge["commands"] = bridge["commands"][-100:]
+            bridge["task_id"] = task_id
+            bridge["task_state"] = next_state
+            bridge["updated_at_ms"] = queued["created_at_ms"]
+            bridge["message"] = f"任务命令已排队：{command}。"
+            result = bridge_snapshot()
+        return jsonify({"accepted": True, **result, "command_seq": queued["seq"]})
+
+    @app.get("/api/tasks/state")
+    def get_task_state() -> Any:
+        return jsonify(bridge_snapshot())
+
+    @app.post("/api/robot/connect")
+    def connect_robot() -> tuple[Any, int] | Any:
+        auth_error = require_robot_token()
+        if auth_error:
+            return auth_error
+        now_ms = int(monotonic_time.time() * 1000)
+        with bridge_lock:
+            bridge["last_seen_monotonic"] = monotonic_time.monotonic()
+            bridge["updated_at_ms"] = now_ms
+            bridge["robot_state"] = "idle"
+            bridge["is_busy"] = False
+            bridge["detections"] = []
+            bridge["message"] = "机械臂客户端已连接，等待任务启动。"
+            # 新进程从当前序号开始，避免重放上次进程遗留的启动命令。
+            cursor = bridge["last_command_seq"]
+        return jsonify({"after_seq": cursor, "timestamp_ms": now_ms})
+
+    @app.get("/api/robot/poll")
+    def poll_robot() -> tuple[Any, int] | Any:
+        auth_error = require_robot_token()
+        if auth_error:
+            return auth_error
+        try:
+            after_seq = int(request.args.get("after_seq", "0"))
+        except ValueError as error:
+            raise RequestError("after_seq 必须是非负整数。") from error
+        if after_seq < 0:
+            raise RequestError("after_seq 必须是非负整数。")
+        with bridge_lock:
+            bridge["last_seen_monotonic"] = monotonic_time.monotonic()
+            commands = [item for item in bridge["commands"] if item["seq"] > after_seq]
+            return jsonify({"commands": commands, "last_command_seq": bridge["last_command_seq"], "timestamp_ms": int(monotonic_time.time() * 1000)})
+
+    @app.post("/api/robot/status")
+    def report_robot_status() -> tuple[Any, int] | Any:
+        auth_error = require_robot_token()
+        if auth_error:
+            return auth_error
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            raise RequestError("请求体必须是 JSON 对象。")
+        task_state = payload.get("task_state")
+        robot_state = payload.get("robot_state")
+        if task_state not in TASK_STATES or robot_state not in ROBOT_STATES:
+            raise RequestError("task_state 或 robot_state 无效。")
+        detections = payload.get("detections", [])
+        if not isinstance(detections, list) or len(detections) > 20 or any(not isinstance(item, str) or len(item) > 64 for item in detections):
+            raise RequestError("detections 必须是最多20个字符串组成的数组。")
+        is_busy = payload.get("is_busy", False)
+        if not isinstance(is_busy, bool):
+            raise RequestError("is_busy 必须是布尔值。")
+        message = payload.get("message", "")
+        if not isinstance(message, str) or len(message) > 256:
+            raise RequestError("message 必须是不超过256个字符的字符串。")
+        with bridge_lock:
+            bridge["task_state"] = task_state
+            bridge["robot_state"] = robot_state
+            bridge["task_id"] = payload.get("task_id") or bridge["task_id"]
+            bridge["detections"] = detections
+            bridge["is_busy"] = is_busy
+            bridge["message"] = message or "设备遥测正常。"
+            bridge["last_seen_monotonic"] = monotonic_time.monotonic()
+            bridge["updated_at_ms"] = int(monotonic_time.time() * 1000)
+        return jsonify({"accepted": True, "timestamp_ms": bridge["updated_at_ms"]})
+
+    @app.post("/api/robot/frame")
+    def upload_robot_frame() -> tuple[Any, int] | Any:
+        """接受机械臂端上传的最新 JPEG 帧，供监控页读取。"""
+        auth_error = require_robot_token()
+        if auth_error:
+            return auth_error
+        if request.mimetype != "image/jpeg":
+            return jsonify({"error": "视频帧必须使用 image/jpeg。"}), 415
+        frame = request.get_data(cache=False)
+        if not frame or len(frame) > 2 * 1024 * 1024:
+            return jsonify({"error": "视频帧为空或超过2MB。"}), 413
+        now_ms = int(monotonic_time.time() * 1000)
+        frame_id = request.headers.get("X-Frame-Id", f"frame_{now_ms}")[:64]
+        with bridge_lock:
+            bridge["latest_frame"] = frame
+            bridge["latest_frame_id"] = frame_id
+            bridge["latest_frame_timestamp_ms"] = now_ms
+            bridge["last_seen_monotonic"] = monotonic_time.monotonic()
+        return jsonify({"accepted": True, "frame_id": frame_id, "timestamp_ms": now_ms})
+
+    @app.get("/api/robot/frame")
+    def get_robot_frame() -> Response:
+        with bridge_lock:
+            frame = bridge["latest_frame"]
+            frame_id = bridge["latest_frame_id"]
+            timestamp_ms = bridge["latest_frame_timestamp_ms"]
+        if not frame:
+            return Response(status=204)
+        response = Response(frame, mimetype="image/jpeg")
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["X-Frame-Id"] = frame_id or ""
+        response.headers["X-Frame-Timestamp-Ms"] = str(timestamp_ms or "")
+        return response
 
     @app.errorhandler(RequestError)
     def handle_request_error(error: RequestError) -> tuple[Any, int]:
@@ -367,4 +604,4 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host=os.environ.get("FLASK_HOST", "0.0.0.0"), port=int(os.environ.get("FLASK_PORT", "5000")), debug=False)
