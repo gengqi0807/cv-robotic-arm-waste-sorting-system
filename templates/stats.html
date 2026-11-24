@@ -66,14 +66,14 @@
           <span class="summary-foot">当前统计范围</span>
         </article>
         <article class="summary-panel summary-success">
-          <span class="summary-label">成功</span>
+          <span class="summary-label">历史成功标记</span>
           <strong class="summary-value" id="success-count">—</strong>
-          <span class="summary-foot">result = success</span>
+          <span class="summary-foot">旧记录未核验实际抓取结果</span>
         </article>
         <article class="summary-panel summary-failure">
           <span class="summary-label">失败</span>
           <strong class="summary-value" id="failure-count">—</strong>
-          <span class="summary-foot">非 success 结果</span>
+          <span class="summary-foot">执行检查明确失败</span>
         </article>
         <article class="summary-panel summary-fault">
           <span class="summary-label">故障</span>
@@ -82,6 +82,7 @@
         </article>
       </section>
 
+      <p class="range-caption">动作完成、抓取待确认：<strong id="unverified-count">—</strong> 条（不计入成功或失败）</p>
       <section class="category-section" aria-labelledby="category-title">
         <div class="section-heading">
           <div><h2 id="category-title">类别分布</h2><p class="muted">数量及占当前分拣总数的比例</p></div>

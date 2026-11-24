@@ -85,7 +85,8 @@ class FakeCursor:
             self.result = {
                 "total_count": len(rows),
                 "success_count": sum(row["result"] == "success" for row in rows),
-                "failure_count": sum(row["result"] != "success" for row in rows),
+                "failure_count": sum(row["result"] == "failed" for row in rows),
+                "unverified_count": sum(row["result"] == "unverified" for row in rows),
                 "fault_count": sum(bool(row["error_code"]) for row in rows),
                 **{f"{key}_count": value for key, value in categories.items()},
             }
@@ -143,6 +144,17 @@ class EventsApiTests(unittest.TestCase):
         self.assertTrue(first.json["created"])
         self.assertFalse(second.json["created"])
         self.assertEqual(len(self.database.rows), 1)
+
+    def test_unverified_is_saved_filtered_and_not_counted_as_failure(self) -> None:
+        for event_id, result in [('pending', 'unverified'), ('bad', 'failed')]:
+            response = self.client.post('/api/events', json=make_event(event_id, result=result))
+            self.assertEqual(response.status_code, 201)
+        items = self.client.get('/api/events?result=unverified').json['items']
+        self.assertEqual([item['event_id'] for item in items], ['pending'])
+        stats = self.client.get('/api/stats').json
+        self.assertEqual(stats['success_count'], 0)
+        self.assertEqual(stats['failure_count'], 1)
+        self.assertEqual(stats['unverified_count'], 1)
 
     def test_list_is_filtered_sorted_and_paginated(self) -> None:
         self.database.rows = {

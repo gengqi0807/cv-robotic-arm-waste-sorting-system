@@ -49,3 +49,14 @@ temp/
 
 # CSV exports
 *.csv
+# 本地备份（含真实 MySQL 密码，绝不能提交）
+_bak_mysql/
+_bak_*/
+
+# 板子端模型文件（体积大，从课程材料自备）
+model/
+*.om
+
+# 板子端真实连接配置（只提交 .example）
+robot_bridge.env
+arm/**/robot_bridge.env

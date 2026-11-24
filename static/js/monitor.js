@@ -6,6 +6,19 @@ const classNames = {
   hazardous: "有害垃圾",
   other: "其他垃圾",
 };
+// 板子上报的 detections 是颜色名（Red/Blue/Green/Yellow），
+// 这里先转成垃圾类别，再显示中文名。
+const colorToClass = {
+  Red: "hazardous",      // 红色 → 有害垃圾
+  Blue: "recyclable",    // 蓝色 → 可回收物
+  Green: "kitchen",      // 绿色 → 厨余垃圾
+  Yellow: "other",       // 黄色 → 其他垃圾
+};
+function classNameOf(id) {
+  if (id === undefined || id === null || id === "") return "—";
+  const mapped = colorToClass[id] || id;
+  return classNames[mapped] || mapped;
+}
 const robotNames = { idle: "空闲", running: "运行", paused: "暂停", fault: "故障", estop: "急停" };
 const elements = {
   modePill: document.querySelector("#monitor-mode-pill"),
@@ -55,9 +68,16 @@ function setState(value) {
 
 function updateDetection(data, source = "实时 detect 消息") {
   const detections = Array.isArray(data.detections) ? data.detections : [];
-  const detection = detections[0] || data.detection || data;
-  if (detection.class_id) document.querySelector("#detected-class").textContent = classNames[detection.class_id] || detection.class_name || detection.class_id;
-  else if (detection.class_name) document.querySelector("#detected-class").textContent = detection.class_name;
+  let detection = detections[0] || data.detection || data;
+  // 板子上报的 detections 可能是字符串数组（["Red","Blue"]），
+  // 也可能是对象数组（[{class_id:"Red",...}]），两种都兼容。
+  if (typeof detection === "string") detection = { class_id: detection };
+  const rawId = detection.class_id || detection.class_name;
+  if (rawId) {
+    document.querySelector("#detected-class").textContent = classNameOf(rawId);
+  } else if (detections.length === 0) {
+    document.querySelector("#detected-class").textContent = "暂无设备识别";
+  }
   if (detection.confidence !== undefined) document.querySelector("#detected-confidence").textContent = Number(detection.confidence).toFixed(3);
   if (detection.u_px !== undefined || detection.v_px !== undefined) {
     document.querySelector("#detected-pixel").textContent = `${detection.u_px ?? "—"} px, ${detection.v_px ?? "—"} px`;

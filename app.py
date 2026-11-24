@@ -334,6 +334,51 @@ def create_app(
     def get_task_state() -> Any:
         return jsonify(bridge_snapshot())
 
+    # ================= 课程任务动作接口 =================
+    # 和 /api/tasks/control 不同：这个接口不受 idle/running 状态机约束，
+    # 专门用来触发一次性的演示动作（RGB、蜂鸣器、读舵机、跳舞、叠罗汉……）。
+    TASK_ACTIONS = {
+        "rgb", "buzzer", "read_servo", "wave", "dance",
+        "grab_once", "stack", "carry", "asr",
+    }
+
+    @app.post("/api/tasks/action")
+    def task_action() -> tuple[Any, int] | Any:
+        origin_error = require_same_origin()
+        if origin_error:
+            return origin_error
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            raise RequestError("请求体必须是 JSON 对象。")
+        action = payload.get("action")
+        if action not in TASK_ACTIONS:
+            raise RequestError(f"action 必须是 {', '.join(sorted(TASK_ACTIONS))} 之一。")
+        args = payload.get("args") or {}
+        if not isinstance(args, dict):
+            raise RequestError("args 必须是 JSON 对象。")
+
+        with bridge_lock:
+            online = (
+                bridge["last_seen_monotonic"] is not None
+                and monotonic_time.monotonic() - bridge["last_seen_monotonic"] <= 5
+            )
+            if not online:
+                return jsonify({"accepted": False, "reason_code": "ROBOT_OFFLINE",
+                                "message": "机械臂未在线，未发送动作命令。"}), 409
+            bridge["last_command_seq"] += 1
+            queued = {
+                "seq": bridge["last_command_seq"],
+                "command": "action",
+                "action": action,
+                "args": args,
+                "created_at_ms": int(monotonic_time.time() * 1000),
+            }
+            bridge["commands"].append(queued)
+            bridge["commands"] = bridge["commands"][-100:]
+            bridge["message"] = f"动作命令已排队：{action}。"
+            result = bridge_snapshot()
+        return jsonify({"accepted": True, **result, "command_seq": queued["seq"]})
+
     @app.post("/api/robot/connect")
     def connect_robot() -> tuple[Any, int] | Any:
         auth_error = require_robot_token()
@@ -564,7 +609,8 @@ def create_app(
                 cursor.execute(
                     "SELECT COUNT(*) AS `total_count`, "
                     "SUM(CASE WHEN `result` = 'success' THEN 1 ELSE 0 END) AS `success_count`, "
-                    "SUM(CASE WHEN `result` <> 'success' THEN 1 ELSE 0 END) AS `failure_count`, "
+                    "SUM(CASE WHEN `result` = 'failed' THEN 1 ELSE 0 END) AS `failure_count`, "
+                    "SUM(CASE WHEN `result` = 'unverified' THEN 1 ELSE 0 END) AS `unverified_count`, "
                     "SUM(CASE WHEN `error_code` IS NOT NULL AND `error_code` <> '' THEN 1 ELSE 0 END) AS `fault_count`, "
                     "SUM(CASE WHEN `class_id` = 'recyclable' THEN 1 ELSE 0 END) AS `recyclable_count`, "
                     "SUM(CASE WHEN `class_id` = 'kitchen' THEN 1 ELSE 0 END) AS `kitchen_count`, "
@@ -593,6 +639,7 @@ def create_app(
                 "categories": categories,
                 "success_count": int(row["success_count"] or 0),
                 "failure_count": int(row["failure_count"] or 0),
+                "unverified_count": int(row["unverified_count"] or 0),
                 "fault_count": int(row["fault_count"] or 0),
             }
         )

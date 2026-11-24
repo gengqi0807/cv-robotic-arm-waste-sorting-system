@@ -6,11 +6,14 @@ const classNames = {
   hazardous: "有害垃圾",
   other: "其他垃圾",
 };
+// 颜色和积木颜色一一对应：
+//   Blue 蓝积木 → 可回收物   Green 绿积木 → 厨余垃圾
+//   Red 红积木  → 有害垃圾   Yellow 黄积木 → 其他垃圾
 const classColors = {
-  recyclable: "#27785d",
-  kitchen: "#c86a35",
-  hazardous: "#a9423d",
-  other: "#657c91",
+  recyclable: "#2563eb",   // 蓝
+  kitchen: "#16a34a",      // 绿
+  hazardous: "#dc2626",    // 红
+  other: "#eab308",        // 黄
 };
 const elements = {
   dateField: document.querySelector("#date-field"),
@@ -22,6 +25,7 @@ const elements = {
   total: document.querySelector("#total-count"),
   success: document.querySelector("#success-count"),
   failure: document.querySelector("#failure-count"),
+  unverified: document.querySelector("#unverified-count"),
   fault: document.querySelector("#fault-count"),
   categories: document.querySelector("#category-body"),
   error: document.querySelector("#stats-error"),
@@ -111,6 +115,7 @@ async function loadStats() {
     elements.total.textContent = Number(body.total_count || 0).toLocaleString("zh-CN");
     elements.success.textContent = Number(body.success_count || 0).toLocaleString("zh-CN");
     elements.failure.textContent = Number(body.failure_count || 0).toLocaleString("zh-CN");
+    elements.unverified.textContent = Number(body.unverified_count || 0).toLocaleString("zh-CN");
     elements.fault.textContent = Number(body.fault_count || 0).toLocaleString("zh-CN");
     showCategoryRows(body.categories || {});
   } catch (error) {

@@ -215,3 +215,84 @@ document.querySelectorAll(".task-command").forEach((button) => {
 });
 applyState({ task_state: "idle", robot_state: "idle", timestamp_ms: Date.now() }, "本地模拟状态");
 document.querySelector('input[name="control-mode"][value="live"]').dispatchEvent(new Event("change", { bubbles: true }));
+
+/* ===== 课程任务动作（2026-11-20 新增） ===== */
+(function () {
+  const logEl = document.querySelector("#action-log");
+  const errEl = document.querySelector("#action-error");
+  const badgeEl = document.querySelector("#action-badge");
+  const cards = Array.from(document.querySelectorAll(".action-card"));
+  if (!cards.length) return;
+
+  const ACTION_CN = {
+    read_servo: "读取舵机位置",
+    buzzer: "蜂鸣器",
+    rgb: "RGB 灯",
+    wave: "上下左右摆动",
+    dance: "跳舞",
+    grab_once: "夹一块积木",
+    stack: "叠罗汉",
+    carry: "积木搬运工",
+    asr: "语音识别",
+  };
+
+  function log(text) {
+    const stamp = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    logEl.textContent = `[${stamp}] ${text}\n` + logEl.textContent;
+  }
+
+  function showError(text) {
+    if (!text) { errEl.hidden = true; errEl.textContent = ""; return; }
+    errEl.hidden = false;
+    errEl.textContent = text;
+  }
+
+  async function runAction(card) {
+    const action = card.dataset.action;
+    const name = ACTION_CN[action] || action;
+    cards.forEach(c => { c.disabled = true; });
+    card.classList.add("busy");
+    showError("");
+    log(`下发：${name}`);
+    try {
+      const resp = await fetch("/api/tasks/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, args: {} }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data.accepted === false) {
+        const reason = data.message || data.error || `HTTP ${resp.status}`;
+        showError(`${name} 失败：${reason}`);
+        log(`失败：${reason}`);
+        return;
+      }
+      log(`已排队：${name}（seq=${data.command_seq}）`);
+    } catch (e) {
+      showError(`${name} 请求失败：${e}`);
+      log(`请求异常：${e}`);
+    } finally {
+      cards.forEach(c => { c.disabled = false; });
+      card.classList.remove("busy");
+    }
+  }
+
+  cards.forEach(card => {
+    card.addEventListener("click", () => runAction(card));
+  });
+
+  // 设备在线时把徽标点亮
+  async function refreshBadge() {
+    try {
+      const resp = await fetch("/api/tasks/state", { cache: "no-store" });
+      const data = await resp.json();
+      const online = data.robot_online !== false && data.robot_state !== undefined;
+      if (badgeEl) {
+        badgeEl.textContent = online ? "设备在线" : "设备离线";
+        badgeEl.classList.toggle("live", online);
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+  refreshBadge();
+  setInterval(refreshBadge, 3000);
+})();

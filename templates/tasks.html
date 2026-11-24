@@ -45,7 +45,7 @@
         <div class="task-setup-grid">
           <label class="filter-field"><span>操作员编号</span><input id="operator-id" type="text" value="demo-operator" autocomplete="off"></label>
           <label class="filter-field"><span>会话编号</span><input id="session-id" type="text" value="demo-session" autocomplete="off"></label>
-          <label class="filter-field"><span>任务模式</span><select id="task-mode"><option value="single">单次分拣</option><option value="continuous">连续分拣</option></select></label>
+          <label class="filter-field"><span>任务模式</span><select id="task-mode"><option value="continuous" selected>连续分拣</option><option value="single">单次分拣（仅一次）</option></select></label>
         </div>
       </section>
 
@@ -85,6 +85,44 @@
           </div>
         </section>
       </div>
+
+      <section class="task-setup-section" aria-label="课程任务">
+        <div class="section-heading">
+          <div><h2>课程任务演示</h2><p class="muted">点一下直接下发到机械臂，不用敲命令</p></div>
+          <span class="source-badge" id="action-badge">等待设备</span>
+        </div>
+        <div class="action-grid">
+          <button class="action-card" data-action="read_servo" type="button">
+            <strong>读取舵机位置</strong><span>返回 6 个舵机的当前角度</span>
+          </button>
+          <button class="action-card" data-action="buzzer" type="button">
+            <strong>蜂鸣器</strong><span>响一声，验证扩展板通信</span>
+          </button>
+          <button class="action-card" data-action="rgb" type="button">
+            <strong>RGB 灯</strong><span>依次亮红、绿、蓝</span>
+          </button>
+          <button class="action-card" data-action="wave" type="button">
+            <strong>上下左右摆动</strong><span>四个方向各摆一次</span>
+          </button>
+          <button class="action-card" data-action="dance" type="button">
+            <strong>跳舞</strong><span>预设动作序列循环</span>
+          </button>
+          <button class="action-card" data-action="grab_once" type="button">
+            <strong>夹一块积木</strong><span>先回识别位，再等分拣抓一次</span>
+          </button>
+          <button class="action-card" data-action="stack" type="button">
+            <strong>叠罗汉</strong><span>四周 4 块 → 中间摞 4 层</span>
+          </button>
+          <button class="action-card" data-action="carry" type="button">
+            <strong>积木搬运工</strong><span>中间那一摞 → 搬回四周原位</span>
+          </button>
+          <button class="action-card" data-action="asr" type="button">
+            <strong>语音识别</strong><span>录 5 秒并识别成文字</span>
+          </button>
+        </div>
+        <p class="error-message" id="action-error" role="alert" hidden></p>
+        <pre class="action-log" id="action-log" aria-live="polite"></pre>
+      </section>
 
       <section class="contract-note">
         <strong>接口状态</strong>

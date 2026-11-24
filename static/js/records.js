@@ -6,6 +6,11 @@ const classNames = {
   hazardous: "有害垃圾",
   other: "其他垃圾",
 };
+const resultNames = {
+  success: "历史成功标记（未核验）",
+  failed: "失败",
+  unverified: "动作完成，抓取待确认",
+};
 
 const detailNames = {
   event_id: "记录编号",
@@ -107,7 +112,7 @@ function renderRows(items) {
     const resultCell = document.createElement("td");
     const resultTag = document.createElement("span");
     resultTag.className = `result-tag ${item.result === "success" ? "result-success" : item.result === "failed" ? "result-failed" : "result-other"}`;
-    resultTag.textContent = item.result === "success" ? "成功" : item.result === "failed" ? "失败" : item.result;
+    resultTag.textContent = resultNames[item.result] || item.result;
     resultCell.append(resultTag);
     row.append(resultCell);
     row.append(makeCell(`${item.duration_ms} ms`));
@@ -134,23 +139,33 @@ function renderPagination(pagination) {
   elements.next.disabled = pagination.page >= state.totalPages;
 }
 
-async function loadRecords() {
+let recordsRequest = null;
+async function loadRecords(silent = false) {
+  if (silent && recordsRequest) return;
+  if (recordsRequest) recordsRequest.abort();
+  const controller = new AbortController();
+  recordsRequest = controller;
   elements.error.hidden = true;
   elements.error.textContent = "";
-  showEmptyMessage("正在读取记录…");
+  if (!silent) showEmptyMessage("正在读取记录…");
   const params = currentFilters();
   params.set("page", String(state.page));
   params.set("page_size", String(state.pageSize));
   try {
-    const response = await fetch(`/api/events?${params.toString()}`, { headers: { Accept: "application/json" } });
+    const response = await fetch(`/api/events?${params.toString()}`, {
+      headers: { Accept: "application/json" }, cache: "no-store", signal: controller.signal,
+    });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || `请求失败（${response.status}）`);
     renderRows(body.items);
     renderPagination(body.pagination);
   } catch (error) {
-    showEmptyMessage("记录读取失败");
+    if (error.name === "AbortError") return;
+    if (!silent) showEmptyMessage("记录读取失败");
     elements.error.textContent = error.message;
     elements.error.hidden = false;
+  } finally {
+    if (recordsRequest === controller) recordsRequest = null;
   }
 }
 
@@ -172,6 +187,7 @@ async function loadDetail(eventId) {
       term.textContent = detailNames[key] || key;
       const description = document.createElement("dd");
       if (key === "timestamp_ms") description.textContent = formatLocalTime(value);
+      else if (key === "result") description.textContent = resultNames[value] || value;
       else if (key === "class_id") description.textContent = classNames[value] || value || "—";
       else if (key === "confidence" && value !== null) description.textContent = `${(Number(value) * 100).toFixed(1)}%`;
       else description.textContent = value === null || value === "" ? "—" : String(value);
@@ -220,3 +236,6 @@ elements.dialog.addEventListener("click", (event) => {
 const today = new Date();
 elements.date.value = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
 loadRecords();
+setInterval(() => {
+  if (!document.hidden) loadRecords(true);
+}, 3000);
