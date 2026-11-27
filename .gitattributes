@@ -1,0 +1,23 @@
+# 统一换行：仓库里一律存 LF，避免 Windows 下 CRLF 造成"全文重写"的假 diff
+* text=auto eol=lf
+
+# 二进制文件，禁止当文本处理
+*.docx binary
+*.xlsx binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.om   binary
+*.bin  binary
+*.zip  binary
+*.rar  binary
+
+# 脚本用 LF
+*.py   text eol=lf
+*.js   text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+*.md   text eol=lf
+*.ini  text eol=lf
+*.sql  text eol=lf
+*.sh   text eol=lf

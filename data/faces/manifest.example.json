@@ -1,0 +1,42 @@
+{
+  "operators": [
+    {
+      "operator_id": "fei-xianghong",
+      "name": "费翔鸿",
+      "agreed": false,
+      "agreed_at": "",
+      "train_count": 0,
+      "test_count": 0,
+      "collected_by": ""
+    },
+    {
+      "operator_id": "geng-qi",
+      "name": "耿绮",
+      "agreed": false,
+      "agreed_at": "",
+      "train_count": 0,
+      "test_count": 0,
+      "collected_by": ""
+    },
+    {
+      "operator_id": "liu-tianyue",
+      "name": "刘天悦",
+      "agreed": false,
+      "agreed_at": "",
+      "train_count": 0,
+      "test_count": 0,
+      "collected_by": ""
+    },
+    {
+      "operator_id": "zuo-yiwei",
+      "name": "左逸伟",
+      "agreed": false,
+      "agreed_at": "",
+      "train_count": 0,
+      "test_count": 0,
+      "collected_by": ""
+    }
+  ],
+  "unknown_test_count": 0,
+  "collected_at": ""
+}

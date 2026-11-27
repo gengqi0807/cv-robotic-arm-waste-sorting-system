@@ -1,0 +1,33 @@
+<section class="task-control-panel" aria-labelledby="control-title">
+  <div class="section-heading">
+    <h2 id="control-title">任务控制</h2>
+    {% if g.web_context.auth_required %}
+      <span class="operator-label">{{ g.web_user.operator_id }}</span>
+    {% endif %}
+  </div>
+  <div class="workbench-setup">
+    <label class="filter-field"><span>分拣模式</span>
+      <select id="task-mode">
+        <option value="continuous" selected>连续分拣</option>
+        <option value="single">单次分拣</option>
+      </select>
+    </label>
+  </div>
+  <div class="task-buttons">
+    <button class="button button-primary task-command" data-command="start" id="start-task" type="button" disabled><span aria-hidden="true">▶</span> 启动</button>
+    <button class="button button-outline task-command" data-command="pause" id="pause-task" type="button" disabled><span aria-hidden="true">Ⅱ</span> 暂停</button>
+    <button class="button button-outline task-command" data-command="resume" id="resume-task" type="button" disabled><span aria-hidden="true">▷</span> 继续</button>
+    <button class="button button-danger task-command" data-command="finish" id="finish-task" type="button" disabled><span aria-hidden="true">■</span> 结束</button>
+  </div>
+  <p class="error-message workbench-error" id="task-error" role="alert" hidden></p>
+  <p class="safety-note" id="safety-note">紧急情况请按设备实体急停。</p>
+  {% if not g.web_context.auth_required %}
+    <details class="workbench-options workbench-identity" id="control-config">
+      <summary>联调身份</summary>
+      <div class="workbench-setup workbench-identity-fields">
+        <label class="filter-field"><span>操作员编号</span><input id="operator-id" type="text" value="demo-operator" maxlength="64" autocomplete="off"></label>
+        <label class="filter-field"><span>会话编号</span><input id="session-id" type="text" value="demo-session" maxlength="64" autocomplete="off"></label>
+      </div>
+    </details>
+  {% endif %}
+</section>

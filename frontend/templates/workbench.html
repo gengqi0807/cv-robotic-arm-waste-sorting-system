@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3">
+  <title>{{ '分拣工作台' if can_control else '实时监控' }} | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <script type="module" src="{{ url_for('static', filename='js/workbench.js') }}"></script>
+</head>
+<body data-page="workbench">
+  <div class="app-shell">
+    {% set sidebar_label = "分拣工作台" if can_control else "实时监控" %}
+    {% include "_sidebar.html" %}
+    <main class="main-content workbench">
+      <header class="page-header">
+        <h1>{{ '分拣工作台' if can_control else '实时监控' }}</h1>
+        <fieldset class="segmented-control workbench-modes">
+          <legend class="visually-hidden">工作台模式</legend>
+          <label><input type="radio" name="workbench-mode" value="live" checked><span>现场联调</span></label>
+          <label><input type="radio" name="workbench-mode" value="mock"><span>模拟演示</span></label>
+        </fieldset>
+      </header>
+      <div class="workbench-grid">
+        <section class="camera-section" aria-labelledby="camera-title">
+          <div class="section-heading">
+            <div><h2 id="camera-title">相机画面</h2><p class="muted" id="camera-caption">等待设备上传相机画面</p></div>
+            <span class="source-badge" id="camera-source">等待画面</span>
+          </div>
+          <div class="camera-frame" id="camera-frame">
+            <div class="camera-topline"><span><i class="live-dot" aria-hidden="true"></i><span id="camera-live-label">等待画面</span></span><span id="camera-timestamp">—</span></div>
+            <div class="camera-placeholder" id="camera-placeholder"><span>等待机械臂相机画面</span></div>
+            <div class="camera-scene" id="camera-scene" aria-label="模拟工作台与识别目标" hidden>
+              <div class="scene-backline"></div>
+              <div class="scene-grid"></div>
+              <div class="scene-target-box"><span>目标框 · 模拟</span></div>
+              <div class="scene-object"><span></span></div>
+              <div class="scene-crosshair" aria-hidden="true">+</div>
+              <div class="scene-coordinate" id="scene-coordinate"></div>
+            </div>
+            <img id="camera-image" alt="机械臂相机画面" hidden>
+            <div class="camera-footer"><span id="camera-source-detail">板端相机</span><span id="frame-id">—</span></div>
+          </div>
+          <p id="camera-error" class="error-message workbench-error" role="alert" hidden></p>
+        </section>
+
+        <div class="workbench-controls">
+          {% if can_control %}
+            {% include "_workbench_controls.html" %}
+          {% endif %}
+          <section class="task-state-panel" aria-labelledby="task-state-title">
+            <div class="section-heading">
+              <h2 id="task-state-title">设备与任务状态</h2>
+              <span class="source-badge" id="device-status" role="status">正在连接</span>
+            </div>
+            <dl class="status-list workbench-status">
+              <div><dt>任务状态</dt><dd><span class="state-pill" id="task-state-pill">—</span></dd></div>
+              <div><dt>机械臂状态</dt><dd id="current-robot-state">—</dd></div>
+              <div><dt>任务编号</dt><dd id="current-task-id">—</dd></div>
+              <div><dt>最近更新时间</dt><dd id="last-updated">—</dd></div>
+            </dl>
+            <div class="alert-box" id="task-alert" role="status" hidden>
+              <strong id="alert-title">设备提示</strong>
+              <p id="alert-message"></p>
+              <span id="alert-code"></span>
+            </div>
+            <div class="estop-notice" id="estop-notice" role="alert" hidden>
+              <span class="estop-symbol" aria-hidden="true">!</span>
+              <div><strong>急停状态</strong><p>请现场检查设备并由人员执行实体急停复位。</p></div>
+            </div>
+          </section>
+          {% if can_control %}
+            {% include "_workbench_actions.html" %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="workbench-details">
+        <section class="vision-section" aria-labelledby="vision-title">
+          <div class="section-heading"><h2 id="vision-title">视觉识别</h2><span class="source-badge" id="detect-source">等待数据</span></div>
+          <dl class="status-list status-list-wide">
+            <div><dt>类别</dt><dd id="detected-class">—</dd></div>
+            <div><dt>可信度</dt><dd id="detected-confidence">—</dd></div>
+            <div><dt>图像位置（u, v）</dt><dd id="detected-pixel">—</dd></div>
+            <div><dt>目标框（像素）</dt><dd id="detected-box">—</dd></div>
+            <div><dt>识别帧编号</dt><dd id="detected-frame">—</dd></div>
+            <div><dt>识别耗时</dt><dd id="detected-duration">—</dd></div>
+          </dl>
+        </section>
+        <section class="motion-section" aria-labelledby="motion-title">
+          <div class="section-heading"><div><h2 id="motion-title">坐标与执行</h2><p class="muted">机械臂基座坐标系，单位米</p></div><span class="source-badge" id="motion-source">等待数据</span></div>
+          <dl class="status-list status-list-wide">
+            <div><dt>目标坐标（x, y, z）</dt><dd id="target-position">—</dd></div>
+            <div><dt>可达性</dt><dd id="target-reachable">—</dd></div>
+            <div><dt>校准版本</dt><dd id="target-calibration">—</dd></div>
+            <div><dt>执行接受</dt><dd id="execute-accepted">—</dd></div>
+            <div><dt>执行结果</dt><dd id="execute-result">—</dd></div>
+            <div><dt>执行耗时</dt><dd id="execute-duration">—</dd></div>
+          </dl>
+          <p id="monitor-error" class="error-message workbench-error" role="alert" hidden></p>
+        </section>
+      </div>
+      <details class="workbench-options" id="monitor-connection">
+        <summary>监控联调设置</summary>
+        <div class="monitor-connection">
+          <label class="filter-field"><span>扩展状态 WebSocket</span><input id="monitor-ws-url" type="url" placeholder="ws://主机:端口/状态路径" spellcheck="false"></label>
+          <button class="button button-outline" id="connect-monitor" type="button">连接状态流</button>
+          <span id="monitor-ws-state" class="muted" role="status">未连接</span>
+          <label class="filter-field image-url-field"><span>备用图片地址</span><input id="monitor-image-url" type="url" placeholder="https://…/latest.jpg" spellcheck="false"></label>
+          <button class="button button-quiet" id="load-monitor-image" type="button">加载图片</button>
+        </div>
+      </details>
+    </main>
+  </div>
+</body>
+</html>

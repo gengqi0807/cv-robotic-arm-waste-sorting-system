@@ -1,0 +1,26 @@
+<details class="workbench-options course-actions">
+  <summary>课程任务演示</summary>
+  <div class="course-body">
+    <p class="muted" id="action-availability">等待设备连接。</p>
+    {% set actions = [
+      ('read_servo', '读取舵机位置', '读取 6 个舵机的角度'),
+      ('buzzer', '蜂鸣器', '响一声，验证扩展板通信'),
+      ('rgb', 'RGB 灯', '依次亮红、绿、蓝'),
+      ('wave', '上下左右摆动', '四个方向各摆一次'),
+      ('dance', '跳舞', '执行预设动作序列'),
+      ('grab_once', '夹一块积木', '回到识别位后抓取一次'),
+      ('stack', '叠罗汉', '将四块积木叠成四层'),
+      ('carry', '积木搬运工', '将积木搬回四周原位'),
+      ('asr', '语音识别', '录音 5 秒并识别文字'),
+    ] %}
+    <div class="action-grid">
+      {% for id, name, description in actions %}
+        <button class="action-card" data-action="{{ id }}" type="button" disabled>
+          <strong>{{ name }}</strong><span>{{ description }}</span>
+        </button>
+      {% endfor %}
+    </div>
+    <p class="error-message" id="action-error" role="alert" hidden></p>
+    <pre class="action-log" id="action-log" aria-live="polite" hidden></pre>
+  </div>
+</details>

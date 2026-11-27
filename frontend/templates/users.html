@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3">
+  <title>账号管理 | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <style>
+    body { background: var(--canvas); }
+    .users-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr); gap: 18px; }
+    .panel { border: 1px solid var(--line); background: #fff; box-shadow: var(--shadow); }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+    .panel-body { padding: 18px; }
+    .user-table { min-width: 640px; }
+    .user-form { display: grid; gap: 14px; }
+    .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 8px; border: 1px solid #d7e0da; background: #f4faf6; color: #215d4d; font-size: 10px; font-weight: 700; }
+    .empty-state { padding: 18px; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body data-page="users">
+  <div class="app-shell">
+    {% set sidebar_label = "账号管理" %}
+    {% include "_sidebar.html" %}
+
+    <main class="main-content">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">权限管理 / 账号</p>
+          <h1>账号管理</h1>
+        </div>
+      </header>
+
+      <div class="users-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>账号列表</h2>
+              <p class="muted">仅班组长可管理该页，密码不以明文展示。</p>
+            </div>
+            <span class="chip" id="user-count">0 人</span>
+          </div>
+          <div class="panel-body">
+            <div class="table-wrap">
+              <table class="records-table user-table">
+                <thead>
+                  <tr>
+                    <th scope="col">操作员编号</th>
+                    <th scope="col">姓名</th>
+                    <th scope="col">角色</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">工牌</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="user-table-body">
+                  <tr><td class="empty-state" colspan="5">正在加载账号…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="panel-header"><h2>新增账号</h2></div>
+          <div class="panel-body">
+            <form class="user-form" id="user-form">
+              <label class="filter-field">
+                <span>操作员编号</span>
+                <input id="operator-id" type="text" required>
+              </label>
+              <label class="filter-field">
+                <span>姓名</span>
+                <input id="name" type="text" required>
+              </label>
+              <div class="form-row">
+                <label class="filter-field">
+                  <span>角色</span>
+                  <select id="role">
+                    <option value="operator">operator</option>
+                    <option value="manager">manager</option>
+                    <option value="maintainer">maintainer</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span>状态</span>
+                  <select id="status">
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                  </select>
+                </label>
+              </div>
+              <label class="filter-field">
+                <span>密码</span>
+                <input id="password" type="password" placeholder="请输入密码">
+              </label>
+              <label class="filter-field">
+                <span>工牌号码（可选）</span>
+                <input id="badge-code" type="text" placeholder="可选">
+              </label>
+              <button class="button button-primary" type="submit">创建账号</button>
+              <p id="user-message" class="error-message" role="alert" hidden></p>
+            </form>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const tableBody = document.querySelector('#user-table-body');
+    const userMessage = document.querySelector('#user-message');
+    const userCount = document.querySelector('#user-count');
+    const userForm = document.querySelector('#user-form');
+
+    function setMessage(text, isError = true) {
+      userMessage.hidden = false;
+      userMessage.textContent = text;
+      userMessage.style.color = isError ? '#a9423d' : '#1b6d58';
+    }
+
+    async function usersRequest(url, options) {
+      const response = await fetch(url, options);
+      if (response.status === 401) {
+        window.location.assign('/login');
+      }
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '操作失败。');
+      return result;
+    }
+
+    async function deleteUser(operatorId) {
+      if (!window.confirm('确认删除账号 ' + operatorId + ' 吗？')) return;
+      try {
+        await usersRequest('/api/users/' + encodeURIComponent(operatorId), { method: 'DELETE' });
+        setMessage('账号 ' + operatorId + ' 已删除。', false);
+        await loadUsers();
+      } catch (error) {
+        setMessage(error.message);
+      }
+    }
+
+    async function loadUsers() {
+      try {
+        const { items } = await usersRequest('/api/users');
+        userCount.textContent = items.length + ' 人';
+        tableBody.replaceChildren();
+        if (!items.length) {
+          const cell = tableBody.insertRow().insertCell();
+          cell.colSpan = 5;
+          cell.className = 'empty-state';
+          cell.textContent = '暂无账号数据';
+        }
+        for (const item of items) {
+          const row = tableBody.insertRow();
+          for (const value of [item.operator_id, item.name, item.role, item.status]) {
+            row.insertCell().textContent = value;
+          }
+          const button = document.createElement('button');
+          button.className = 'detail-trigger';
+          button.type = 'button';
+          button.textContent = '删除';
+          button.addEventListener('click', () => deleteUser(item.operator_id));
+          row.insertCell().append(button);
+        }
+      } catch (error) {
+        setMessage(error.message);
+      }
+    }
+
+    userForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      userMessage.hidden = true;
+      const payload = {
+        operator_id: document.querySelector('#operator-id').value.trim(),
+        name: document.querySelector('#name').value.trim(),
+        role: document.querySelector('#role').value,
+        status: document.querySelector('#status').value,
+        password: document.querySelector('#password').value,
+        badge_code: document.querySelector('#badge-code').value.trim(),
+      };
+      try {
+        await usersRequest('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        setMessage('账号 ' + payload.operator_id + ' 已创建。', false);
+        userForm.reset();
+        await loadUsers();
+      } catch (error) {
+        setMessage(error.message);
+      }
+    });
+    loadUsers();
+  </script>
+</body>
+</html>

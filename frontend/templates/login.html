@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <style>
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #edf5f1, #f7f9f7);
+      font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+    }
+    .login-shell {
+      width: min(960px, calc(100vw - 32px));
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      min-height: 620px;
+      border: 1px solid #dfe9e2;
+      background: white;
+      box-shadow: 0 24px 60px rgba(15, 39, 31, 0.12);
+    }
+    .login-hero {
+      position: relative;
+      overflow: hidden;
+      padding: 42px 40px;
+      background: linear-gradient(160deg, #173d34 0%, #214e45 44%, #2c6b5b 100%);
+      color: white;
+    }
+    .login-hero::before {
+      content: "";
+      position: absolute;
+      inset: 18% -20% auto auto;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .login-hero-inner {
+      position: relative;
+      z-index: 1;
+    }
+    .brand-mark {
+      display: grid;
+      width: 52px;
+      height: 52px;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,0.24);
+      background: rgba(255,255,255,0.08);
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+    .login-hero h1 {
+      margin: 28px 0 12px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.2;
+    }
+    .login-hero p {
+      margin: 0;
+      color: rgba(255,255,255,0.78);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+    .login-card {
+      padding: 42px 34px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .login-card h2 {
+      margin: 0 0 14px;
+      font-size: 30px;
+      color: #183a30;
+    }
+    .subtext {
+      margin: 0 0 28px;
+      color: #6d7a74;
+      font-size: 13px;
+    }
+    .auth-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+    .auth-tab {
+      flex: 1;
+      min-height: 38px;
+      border: 1px solid #dfe9e2;
+      background: #f7faf8;
+      color: #486157;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .auth-tab.active {
+      background: #183d34;
+      color: white;
+      border-color: #183d34;
+    }
+    .auth-panel {
+      display: none;
+      gap: 18px;
+    }
+    .auth-panel.active {
+      display: grid;
+    }
+    .field {
+      display: grid;
+      gap: 8px;
+      font-size: 12px;
+      color: #495e56;
+      font-weight: 700;
+    }
+    .field input {
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid #ccd9d2;
+      background: white;
+      color: #1b2d27;
+      font-size: 13px;
+    }
+    .field input:focus {
+      outline: 2px solid rgba(23, 107, 85, 0.12);
+      border-color: #1b6d58;
+    }
+    .action-btn {
+      min-height: 44px;
+      border: 0;
+      background: #176b55;
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .action-btn:hover {
+      background: #11543f;
+    }
+    .secondary-btn {
+      border: 1px solid #d5e3dc;
+      background: white;
+      color: #1b4e42;
+      font-weight: 700;
+    }
+    .notice {
+      min-height: 48px;
+      padding: 12px 14px;
+      border-left: 3px solid #d97d3d;
+      background: #fff6ef;
+      color: #7a4f2b;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .notice.error {
+      color: #8c3d35;
+      background: #fff1f0;
+      border-left-color: #b6524b;
+    }
+    .notice.success {
+      color: #1d5b48;
+      background: #ebf8f0;
+      border-left-color: #1b7d5f;
+    }
+    .hint {
+      font-size: 11px;
+      color: #6d7a74;
+      line-height: 1.6;
+    }
+    #face-form { display: grid; gap: 10px; margin-bottom: 20px; }
+    .camera-preview { display: block; width: 100%; max-height: 260px; aspect-ratio: 4 / 3; object-fit: contain; background: #172f28; transform: scaleX(-1); }
+    .camera-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .camera-buttons button, #face-upload { min-height: 38px; padding-inline: 13px; cursor: pointer; }
+    #face-form button:disabled { cursor: not-allowed; opacity: .55; }
+    .camera-status { margin: 0; font-size: 12px; color: #495e56; }
+    .upload-options { font-size: 12px; color: #1b4e42; }
+    .upload-options summary { cursor: pointer; }
+    .upload-options .field { margin-block: 10px; }
+    @media (max-width: 768px) {
+      .login-shell {
+        grid-template-columns: 1fr;
+      }
+      .login-hero { min-height: 220px; }
+    }
+  </style>
+</head>
+<body data-page="login">
+  <div class="login-shell">
+    <section class="login-hero">
+      <div class="login-hero-inner">
+        <div class="brand-mark">分</div>
+        <h1>智能分拣与机械臂管理平台</h1>
+        <p>人脸认证、密码/工牌备用登录、角色化权限控制与设备状态统一入口。</p>
+      </div>
+    </section>
+
+    <section class="login-card">
+      <h2>登录</h2>
+      {% if g.web_context.face_image_login_enabled %}
+        <form id="face-form" enctype="multipart/form-data">
+          <video id="face-preview" class="camera-preview" aria-label="本机摄像头预览" autoplay muted playsinline hidden></video>
+          <div class="camera-buttons">
+            <button class="action-btn" id="camera-open" type="button">打开电脑摄像头</button>
+            <button class="action-btn" id="camera-capture" type="button" hidden disabled>拍照识别</button>
+            <button class="secondary-btn" id="camera-close" type="button" hidden>关闭摄像头</button>
+          </div>
+          <p class="camera-status" id="camera-status" role="status" hidden></p>
+          <details class="upload-options">
+            <summary>从文件选择照片</summary>
+            <div class="field">
+              <label for="face-image">人脸图片</label>
+              <input id="face-image" name="image" type="file" accept="image/*">
+            </div>
+            <button class="secondary-btn" id="face-upload" type="submit">上传识别</button>
+          </details>
+          <span class="hint">点击拍照时提交一张图片用于识别。当前未启用活体检测。</span>
+        </form>
+      {% endif %}
+      <form id="password-form">
+        <div class="field">
+          <label for="operator-id">员工编号</label>
+          <input id="operator-id" name="operator_id" type="text" autocomplete="username" maxlength="64" required>
+        </div>
+        <div class="field">
+          <label for="password-input">密码</label>
+          <input id="password-input" name="password" type="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="badge-input">工牌号码（备用登录）</label>
+          <input id="badge-input" name="badge_code" type="text" maxlength="64">
+        </div>
+        <button class="action-btn" type="submit">登录</button>
+      </form>
+      <div id="login-message" class="notice error" role="alert" hidden></div>
+    </section>
+  </div>
+  <script>
+    const message = document.querySelector('#login-message');
+    function showError(error) {
+      message.textContent = error.message;
+      message.hidden = false;
+    }
+
+    async function signIn(endpoint, options) {
+      message.hidden = true;
+      try {
+        const response = await fetch(endpoint, { method: 'POST', ...options });
+        const result = await response.json();
+        if (!response.ok || !result.authorized) {
+          throw new Error(result.message || result.error || '登录失败，请检查身份或凭据。');
+        }
+        window.location.assign('/login');
+      } catch (error) {
+        showError(error);
+      }
+    }
+
+    document.querySelector('#password-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      return signIn('/api/auth/password', {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(form)),
+      });
+    });
+    async function encodeFaceImage(source, width, height) {
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 1280 / Math.max(width, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+      const photo = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+      if (!photo || photo.size > 2 * 1024 * 1024) {
+        throw new Error('无法压缩图片，请选择较小的照片。');
+      }
+      const body = new FormData();
+      body.append('image', photo, 'face.jpg');
+      return body;
+    }
+
+    const faceForm = document.querySelector('#face-form');
+    if (faceForm) {
+      const preview = document.querySelector('#face-preview');
+      const openCamera = document.querySelector('#camera-open');
+      const capture = document.querySelector('#camera-capture');
+      const closeCamera = document.querySelector('#camera-close');
+      const upload = document.querySelector('#face-upload');
+      const status = document.querySelector('#camera-status');
+      let stream;
+      let cameraRequest = 0;
+      let submitting = false;
+
+      function setCameraStatus(text = '') {
+        status.textContent = text;
+        status.hidden = !text;
+      }
+
+      function stopCamera() {
+        cameraRequest += 1;
+        const previous = stream;
+        stream = undefined;
+        previous?.getTracks().forEach((track) => track.stop());
+        preview.srcObject = null;
+        preview.hidden = true;
+        capture.hidden = true;
+        capture.disabled = true;
+        closeCamera.hidden = true;
+        openCamera.hidden = false;
+        openCamera.disabled = submitting;
+        setCameraStatus();
+      }
+
+      openCamera.addEventListener('click', async () => {
+        message.hidden = true;
+        if (!navigator.mediaDevices?.getUserMedia) {
+          showError(new Error('请用 HTTPS 或本机 127.0.0.1 地址打开页面，以访问摄像头。'));
+          return;
+        }
+        const requestId = ++cameraRequest;
+        openCamera.disabled = true;
+        setCameraStatus('等待浏览器摄像头授权…');
+        try {
+          const videoStream = await navigator.mediaDevices.getUserMedia({
+            audio: false, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          });
+          if (requestId !== cameraRequest) {
+            videoStream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          stream = videoStream;
+          preview.srcObject = stream;
+          preview.hidden = false;
+          closeCamera.hidden = false;
+          await preview.play();
+          if (requestId !== cameraRequest) return;
+          openCamera.hidden = true;
+          capture.hidden = false;
+          capture.disabled = false;
+          for (const track of stream.getVideoTracks()) {
+            track.addEventListener('ended', () => {
+              if (stream !== videoStream) return;
+              stopCamera();
+              showError(new Error('摄像头已断开，请重新打开。'));
+            });
+          }
+          setCameraStatus('请正对镜头，确认画面清晰后点击拍照识别。');
+        } catch (error) {
+          if (requestId !== cameraRequest) return;
+          stopCamera();
+          const reasons = {
+            NotAllowedError: '请在浏览器地址栏允许使用摄像头，然后重试。',
+            NotFoundError: '未找到可用摄像头。检查系统设置或摄像头连接后重试。',
+            NotReadableError: '无法读取摄像头。关闭可能占用摄像头的应用后重试。',
+          };
+          showError(new Error(reasons[error.name] || '摄像头开启失败，请检查浏览器和系统设置。'));
+        }
+      });
+
+      async function submitFace(makeBody, terminalId) {
+        if (submitting) return;
+        submitting = true;
+        upload.disabled = capture.disabled = openCamera.disabled = true;
+        message.hidden = true;
+        setCameraStatus('正在识别人脸…');
+        try {
+          const body = await makeBody();
+          body.append('terminal_id', terminalId);
+          await signIn('/api/auth/face/image', { body });
+        } catch (error) {
+          showError(error);
+        } finally {
+          submitting = false;
+          upload.disabled = openCamera.disabled = false;
+          capture.disabled = !stream;
+          setCameraStatus(stream ? '请正对镜头，确认画面清晰后点击拍照识别。' : '');
+        }
+      }
+
+      capture.addEventListener('click', () => {
+        if (!stream || !preview.videoWidth || !preview.videoHeight) return;
+        submitFace(() => encodeFaceImage(preview, preview.videoWidth, preview.videoHeight), 'web-camera');
+      });
+      closeCamera.addEventListener('click', stopCamera);
+      window.addEventListener('pagehide', stopCamera);
+
+      faceForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const file = event.currentTarget.elements.image.files[0];
+        if (!file) {
+          showError(new Error('请先选择一张人脸照片。'));
+          return;
+        }
+        stopCamera();
+        submitFace(async () => {
+          let bitmap;
+          try {
+            bitmap = await createImageBitmap(file);
+          } catch {
+            throw new Error('无法读取图片，请选择清晰的 JPG 或 PNG 照片。');
+          }
+          try {
+            return await encodeFaceImage(bitmap, bitmap.width, bitmap.height);
+          } finally {
+            bitmap.close();
+          }
+        }, 'web-image');
+      });
+    }
+  </script>
+</body>
+</html>

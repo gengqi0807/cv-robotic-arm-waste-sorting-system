@@ -11,8 +11,8 @@ from time import perf_counter
 from typing import Any, Callable
 from uuid import uuid4
 
-from app import EVENT_FIELDS, create_app
-from database import DEFAULT_CONFIG_PATH, get_connection, load_db_config
+from backend.app import EVENT_FIELDS, create_app
+from backend.database import default_config_path, get_connection, load_db_config
 
 
 class PagesAcceptanceVerifier:
@@ -21,7 +21,7 @@ class PagesAcceptanceVerifier:
     def __init__(self, config_path: Path) -> None:
         self.config_path = config_path
         self.config = load_db_config(config_path)
-        self.app = create_app({"TESTING": True, "DB_CONFIG_PATH": config_path})
+        self.app = create_app({"TESTING": True, "WEB_AUTH_REQUIRED": False, "DB_CONFIG_PATH": config_path})
         self.client = self.app.test_client()
         self.run_id = uuid4().hex
         self.event_prefix = f"pages_{self.run_id}"
@@ -197,7 +197,7 @@ class PagesAcceptanceVerifier:
         before_items, before_total = self.read_window(self.client, start_ms, end_ms)
 
         # 使用全新 Flask app 和 test_client 模拟服务重启后的重新接入。
-        restarted_app = create_app({"TESTING": True, "DB_CONFIG_PATH": self.config_path})
+        restarted_app = create_app({"TESTING": True, "WEB_AUTH_REQUIRED": False, "DB_CONFIG_PATH": self.config_path})
         restarted_client = restarted_app.test_client()
         after_items, after_total = self.read_window(restarted_client, start_ms, end_ms)
 
@@ -343,12 +343,13 @@ class PagesAcceptanceVerifier:
 
 
 def main() -> int:
+    default_config = default_config_path()
     parser = argparse.ArgumentParser(description="验收 FR-03 记录显示、查询持久性和统计一致性。")
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEFAULT_CONFIG_PATH,
-        help=f"MySQL 配置文件（默认：{DEFAULT_CONFIG_PATH}）",
+        default=default_config,
+        help=f"MySQL 配置文件（默认：{default_config}）",
     )
     args = parser.parse_args()
     try:

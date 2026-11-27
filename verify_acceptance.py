@@ -11,8 +11,8 @@ import sys
 from typing import Any, Callable
 from uuid import uuid4
 
-from app import EVENT_FIELDS, create_app
-from database import DEFAULT_CONFIG_PATH, get_connection, load_db_config
+from backend.app import EVENT_FIELDS, create_app
+from backend.database import default_config_path, get_connection, load_db_config
 
 
 class AcceptanceVerifier:
@@ -21,7 +21,7 @@ class AcceptanceVerifier:
     def __init__(self, config_path: Path) -> None:
         self.config_path = config_path
         self.config = load_db_config(config_path)
-        self.app = create_app({"TESTING": True, "DB_CONFIG_PATH": config_path})
+        self.app = create_app({"TESTING": True, "WEB_AUTH_REQUIRED": False, "DB_CONFIG_PATH": config_path})
         self.client = self.app.test_client()
         self.run_id = uuid4().hex
         self.event_prefix = f"acceptance_{self.run_id}"
@@ -346,12 +346,13 @@ class AcceptanceVerifier:
 
 
 def main() -> int:
+    default_config = default_config_path()
     parser = argparse.ArgumentParser(description="验收分拣事件保存、查询、统计和导出接口。")
     parser.add_argument(
         "--config",
         type=Path,
-        default=DEFAULT_CONFIG_PATH,
-        help=f"MySQL 配置文件（默认：{DEFAULT_CONFIG_PATH}）",
+        default=default_config,
+        help=f"MySQL 配置文件（默认：{default_config}）",
     )
     args = parser.parse_args()
 

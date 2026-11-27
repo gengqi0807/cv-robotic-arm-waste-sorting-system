@@ -1,0 +1,2 @@
+-r requirements.txt
+opencv-contrib-python-headless>=4.8,<6

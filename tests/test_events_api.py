@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 import unittest
 from typing import Any
 
@@ -84,7 +85,8 @@ class FakeCursor:
             self.result = {
                 "total_count": len(rows),
                 "success_count": sum(row["result"] == "success" for row in rows),
-                "failure_count": sum(row["result"] != "success" for row in rows),
+                "failure_count": sum(row["result"] == "failed" for row in rows),
+                "unverified_count": sum(row["result"] == "unverified" for row in rows),
                 "fault_count": sum(bool(row["error_code"]) for row in rows),
                 **{f"{key}_count": value for key, value in categories.items()},
             }
@@ -128,7 +130,9 @@ def make_event(event_id: str, timestamp_ms: int = 1000, **overrides: Any) -> dic
 class EventsApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.database = FakeDatabase()
-        self.client = create_app({"TESTING": True}, self.database.connect).test_client()
+        self.client = create_app(
+            {"TESTING": True, "WEB_AUTH_REQUIRED": False, "ROBOT_BRIDGE_TOKEN": "test-token"}, self.database.connect
+        ).test_client()
 
     def test_duplicate_event_id_is_idempotent(self) -> None:
         event = make_event("event-001")
@@ -140,6 +144,17 @@ class EventsApiTests(unittest.TestCase):
         self.assertTrue(first.json["created"])
         self.assertFalse(second.json["created"])
         self.assertEqual(len(self.database.rows), 1)
+
+    def test_unverified_is_saved_filtered_and_not_counted_as_failure(self) -> None:
+        for event_id, result in [('pending', 'unverified'), ('bad', 'failed')]:
+            response = self.client.post('/api/events', json=make_event(event_id, result=result))
+            self.assertEqual(response.status_code, 201)
+        items = self.client.get('/api/events?result=unverified').json['items']
+        self.assertEqual([item['event_id'] for item in items], ['pending'])
+        stats = self.client.get('/api/stats').json
+        self.assertEqual(stats['success_count'], 0)
+        self.assertEqual(stats['failure_count'], 1)
+        self.assertEqual(stats['unverified_count'], 1)
 
     def test_list_is_filtered_sorted_and_paginated(self) -> None:
         self.database.rows = {
@@ -192,14 +207,45 @@ class EventsApiTests(unittest.TestCase):
         self.assertIsInstance(response.json, dict)
         self.assertIn("error", response.json)
 
-    def test_task_and_monitor_pages_render(self) -> None:
+    def test_workbench_combines_camera_and_commands(self) -> None:
         task_page = self.client.get("/tasks")
         monitor_page = self.client.get("/monitor")
 
         self.assertEqual(task_page.status_code, 200)
-        self.assertIn("/api/tasks/control", task_page.get_data(as_text=True))
-        self.assertEqual(monitor_page.status_code, 200)
-        self.assertIn("模拟数据", monitor_page.get_data(as_text=True))
+        html = task_page.get_data(as_text=True)
+        self.assertIn('id="camera-image"', html)
+        self.assertIn('id="start-task"', html)
+        self.assertIn('id="pause-task"', html)
+        self.assertIn('value="live" checked', html)
+        self.assertEqual(html.count('name="workbench-mode"'), 2)
+        self.assertEqual(monitor_page.status_code, 302)
+        self.assertEqual(monitor_page.location, "/tasks")
+
+    def test_start_command_is_queued_for_online_robot(self) -> None:
+        app = self.client.application
+        bridge = app.extensions["robot_bridge"]
+        bridge["last_seen_monotonic"] = time.monotonic()
+        response = self.client.post(
+            "/api/tasks/control",
+            json={
+                "command": "start",
+                "task_mode": "continuous",
+                "operator_id": "operator-1",
+                "session_id": "session-1",
+                "request_id": "request-1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["accepted"])
+        self.assertEqual(response.json["task_state"], "running")
+
+        polled = self.client.get(
+            "/api/robot/poll?after_seq=0",
+            headers={"Authorization": "Bearer test-token"},
+        )
+        self.assertEqual(polled.status_code, 200)
+        self.assertEqual(polled.json["commands"][0]["command"], "start")
 
 
 if __name__ == "__main__":
