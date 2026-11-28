@@ -197,8 +197,9 @@
     <section class="login-card">
       <h2>登录</h2>
       {% if g.web_context.face_image_login_enabled %}
-        <form id="face-form" enctype="multipart/form-data">
+        <form id="face-form" enctype="multipart/form-data" data-camera-source="{{ g.web_context.face_camera_source or 'browser' }}">
           <video id="face-preview" class="camera-preview" aria-label="本机摄像头预览" autoplay muted playsinline hidden></video>
+          <img id="robot-face-preview" class="camera-preview" alt="机械臂人脸观察位画面" hidden>
           <div class="camera-buttons">
             <button class="action-btn" id="camera-open" type="button">重新开启自动识别</button>
             <button class="secondary-btn" id="camera-close" type="button" hidden>关闭摄像头</button>

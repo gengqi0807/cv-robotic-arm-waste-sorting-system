@@ -75,3 +75,9 @@ node --test tests/webrtc-player.test.cjs tests/login.test.cjs
 ```
 
 测试默认从相邻 RobotArm-a/web_api 导入业务源码，可用 `ROBOT_WEB_API_ROOT` 指定。普通 `python app.py` 可独立部署，仅需 Flask 和远程 API。
+
+## 启动认证与机械臂人脸观察位
+
+实机流程已改为：启动 API → 机器人复用叠罗汉 ready → 到位验证 → 自动人脸认证 → 操作员显式启动 → 返回分拣观察位。启动不自动抓取。Linux API 使用 `bash web_api/run_robot_api.sh`，机器人在 ros-arm-env 使用 `bash start_authenticated_robot.sh`；电脑前端 BACKEND_URL 指向机械臂 5002。详见 RobotArm-a/启动认证与观察位说明.md。
+
+部署模式从机械臂相机认证，登录页不打开电脑摄像头；本机临时测试仍用 `python run_backend.py` 和 browser 相机配置，不会驱动机械臂。

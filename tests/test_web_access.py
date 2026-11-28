@@ -221,3 +221,41 @@ class WebAccessTests(unittest.TestCase):
             self.assertEqual(submit().status_code, 422)
             self.assertFalse(self.database.sessions)
         self.assertEqual(client.post('/api/auth/face/image', data={'image': (io.BytesIO(b'bad'), 'bad.jpg')}).status_code, 400)
+
+    def test_robot_startup_pose_login_and_restart_gate(self):
+        import cv2
+        import numpy as np
+        self.app.config.update(ROBOT_AUTH_POSE_REQUIRED=True, FACE_CAMERA_SOURCE='robot',
+                               FACE_IMAGE_LOGIN_ENABLED=True, FACE_THRESHOLD='0.45')
+        old = self.login()
+        board = self.app.test_client()
+        headers = {'Authorization': 'Bearer test-board-token'}
+        with patch('backend.app.monotonic_time.time', return_value=4102444800):
+            boot = board.post('/api/robot/connect', headers=headers).json
+        # A session from the previous boot cannot control this process.
+        self.assertEqual(self.client.get('/api/auth/session').status_code, 401)
+        self.assertEqual(self.client.post('/api/auth/face/device').status_code, 409)
+        self.assertEqual(board.post('/api/robot/auth-ready', headers=headers,
+                                   json={'boot_id': 'wrong', 'ready': True}).status_code, 409)
+        self.assertEqual(board.post('/api/robot/auth-ready', headers=headers,
+                                   json={'boot_id': boot['boot_id'], 'ready': True}).status_code, 200)
+        self.assertEqual(self.client.post('/api/auth/face/device').status_code, 409)  # no fresh image
+        image = cv2.imencode('.jpg', np.zeros((64,64,3), dtype=np.uint8))[1].tobytes()
+        with patch('backend.app.monotonic_time.time', return_value=4102444801):
+            self.assertEqual(board.post('/api/robot/frame', headers={**headers, 'Content-Type':'image/jpeg',
+                                        'X-Frame-Id':'auth_test'}, data=image).status_code, 200)
+        with patch('backend.web_access.now_ms', return_value=4102444801000), patch('backend.train_face_model.FaceRecognizer') as model:
+            model.return_value.predict.return_value = ('operator', 0.1)
+            response = self.client.post('/api/auth/face/device')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json['name'], '费翔鸿')
+        with patch('backend.web_access.now_ms', return_value=4102444801000):
+            result = self.client.post('/api/tasks/control', json={'command':'start', 'task_mode':'continuous', 'request_id':'after-auth'})
+            self.assertEqual(result.status_code, 200)
+            commands = board.get('/api/robot/poll', headers=headers).json['commands']
+            self.assertEqual(commands[0]['session_id'], response.json['session_id'])
+            self.assertEqual(commands[0]['boot_id'], boot['boot_id'])
+        new_boot = board.post('/api/robot/connect', headers=headers).json
+        self.assertNotEqual(new_boot['boot_id'], boot['boot_id'])
+        self.assertFalse(self.app.extensions['robot_bridge']['auth_pose_ready'])
+        self.assertEqual(board.get('/api/robot/poll', headers=headers).json['commands'], [])

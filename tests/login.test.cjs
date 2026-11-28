@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-async function setup(fetch, permissionError) {
+async function setup(fetch, permissionError, robotMode = false) {
   const elements = new Map();
   class Element {
     constructor() { this.listeners = {}; this.hidden = false; this.disabled = false; this.textContent = ''; }
@@ -13,6 +13,9 @@ async function setup(fetch, permissionError) {
     querySelector() { return this.button ||= new Element(); }
   }
   for (const id of ['login-message', 'face-form', 'password-form', 'face-preview', 'camera-open', 'camera-close', 'face-upload', 'camera-status', 'face-success']) elements.set(id, new Element());
+  elements.set('robot-face-preview', new Element());
+  elements.get('robot-face-preview').removeAttribute = () => {};
+  elements.get('face-form').dataset = {cameraSource: robotMode ? 'robot' : 'browser'};
   elements.get('face-preview').videoWidth = 640;
   elements.get('face-preview').videoHeight = 480;
   elements.get('face-preview').play = async () => {};
@@ -104,4 +107,21 @@ test('server failure stops auto capture; hidden page releases camera', async () 
   env.document.listeners.visibilitychange();
   assert.equal(env.timers.size, 0);
   assert.equal(env.stopped(), 2);
+});
+
+test('robot mode waits for ready pose and authenticates without opening the PC camera', async () => {
+  let attempts = 0;
+  const env = await setup(async (url) => {
+    assert.equal(url, '/api/auth/face/device');
+    attempts++;
+    return attempts === 1 ? response(409, {error: '等待机械臂到位'}) :
+      response(200, {authorized:true, name:'耿绮', role:'manager'});
+  }, undefined, true);
+  assert.equal(env.cameraCalls(), 0);
+  await env.run(1000);
+  assert.match(env.elements.get('camera-status').textContent, /等待机械臂到位/);
+  await env.run(1000);
+  assert.match(env.elements.get('face-success').textContent, /耿绮 · 班组长/);
+  await env.run(1400);
+  assert.deepEqual(env.navigations, ['/stats']);
 });

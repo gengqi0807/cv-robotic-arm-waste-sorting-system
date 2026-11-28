@@ -10,6 +10,8 @@
   const upload = select('face-upload');
   const status = select('camera-status');
   const success = select('face-success');
+  const robotMode = faceForm?.dataset?.cameraSource === 'robot';
+  const robotPreview = select('robot-face-preview');
   let stream;
   let generation = 0;
   let requestController;
@@ -35,6 +37,7 @@
     stream?.getTracks().forEach((track) => track.stop());
     stream = undefined;
     if (preview) { preview.srcObject = null; preview.hidden = true; }
+    if (robotPreview) { robotPreview.hidden = true; robotPreview.removeAttribute('src'); }
     if (open) { open.hidden = recognized; open.disabled = recognized; }
     if (close) close.hidden = true;
   }
@@ -71,13 +74,13 @@
     return body;
   }
   async function recognize(current) {
-    if (generation !== current || !stream || recognized) return;
+    if (generation !== current || (!robotMode && !stream) || recognized) return;
     if (Date.now() - startedAt >= 30000) {
       stopCamera();
       showStatus('暂未识别到登记人员，已关闭摄像头。请调整光线后重新开启，或使用密码登录。');
       return;
     }
-    if (!preview.videoWidth || !preview.videoHeight) {
+    if (!robotMode && (!preview.videoWidth || !preview.videoHeight)) {
       timer = setTimeout(() => recognize(current), 300);
       return;
     }
@@ -85,13 +88,19 @@
     requestController = controller;
     showStatus('正在识别，请正对镜头…');
     try {
-      const body = await encode(preview, preview.videoWidth, preview.videoHeight);
+      const body = robotMode ? undefined : await encode(preview, preview.videoWidth, preview.videoHeight);
       if (generation !== current) return;
-      body.append('terminal_id', 'web-camera-auto');
-      const {response, result} = await login('/api/auth/face/image', {body}, controller);
+      if (body) body.append('terminal_id', 'web-camera-auto');
+      if (robotMode) {
+        robotPreview.src = '/api/auth/face/preview?t=' + Date.now();
+        robotPreview.hidden = false;
+      }
+      const {response, result} = await login(robotMode ? '/api/auth/face/device' : '/api/auth/face/image', {body}, controller);
       if (generation !== current) return;
       if (response.ok && result.authorized) { accepted(result, true); return; }
-      if (response.status === 422 || response.status === 401) {
+      if (response.status === 409) {
+        showStatus(result.error || '等待机械臂到达人脸观察位…');
+      } else if (response.status === 422 || response.status === 401) {
         showStatus(response.status === 422 ? '请让单张人脸清晰出现在镜头中，正在继续识别…' : '暂未匹配到登记人员，请正对镜头，正在重试…');
       } else {
         throw new Error(result.error || result.message || '人脸识别服务暂不可用，请重试。');
@@ -111,6 +120,14 @@
     message.hidden = true;
     success.hidden = true;
     const current = generation;
+    if (robotMode) {
+      startedAt = Date.now();
+      close.hidden = false;
+      open.hidden = true;
+      showStatus('等待机械臂到达人脸观察位，请面向机械臂摄像头…');
+      timer = setTimeout(() => recognize(current), 1000);
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       showError(new Error('请使用 HTTPS 或本机 localhost/127.0.0.1 地址访问摄像头。'));
       showStatus('浏览器无法访问摄像头');
