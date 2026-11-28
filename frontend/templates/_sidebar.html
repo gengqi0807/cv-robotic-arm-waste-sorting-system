@@ -18,6 +18,11 @@
   </nav>
   {% if user %}
     <form class="rail-foot" method="post" action="{{ url_for('forward_api', api_path='auth/logout') }}">
+      <div class="account-identity" aria-label="当前登录账号">
+        <span class="account-verified">✓ 已登录</span>
+        <strong>{{ user.name or user.operator_id }}</strong>
+        <span>{{ user.role_name or user.role }}</span>
+      </div>
       <button class="button button-outline" type="submit">退出登录</button>
     </form>
   {% else %}

@@ -18,7 +18,7 @@ class WebCursor(FakeCursor):
         database = self.database
         if "FROM `session` s JOIN `user`" in sql:
             session = database.sessions.get(params[0])
-            self.result = session if session and session["expires_at_ms"] > params[1] else None
+            self.result = {**session, **database.users[session['operator_id']]} if session and session["expires_at_ms"] > params[1] else None
         elif sql.startswith("SELECT * FROM `user`"):
             self.result = database.users.get(params[0])
         elif sql.startswith("INSERT INTO `session`"):
@@ -52,7 +52,7 @@ class WebAccessTests(unittest.TestCase):
     def setUp(self):
         self.database = FakeDatabase()
         self.database.users = {
-            role: {"operator_id": role, "role": role, "status": "active",
+            role: {"operator_id": role, "name": {'operator': '费翔鸿', 'manager': '耿绮', 'maintainer': '左逸伟'}[role], "role": role, "status": "active",
                    "password_hash": self.password_hash, "badge_code": None}
             for role in ("operator", "manager", "maintainer")
         }
@@ -205,8 +205,12 @@ class WebAccessTests(unittest.TestCase):
             response = submit()
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json['authorized'])
+            self.assertEqual(response.json['name'], '费翔鸿')
+            self.assertEqual(response.json['role_name'], '操作员')
             self.assertIn('HttpOnly', response.headers['Set-Cookie'])
             self.assertEqual(client.get('/tasks').status_code, 200)
+            self.assertIn('费翔鸿', client.get('/tasks').get_data(as_text=True))
+            self.assertEqual(client.get('/api/web/context').json['user']['name'], '费翔鸿')
             self.assertEqual(client.get('/api/video/config', base_url='http://localhost').status_code, 200)
             self.assertEqual(submit('http://other.example').status_code, 403)
             client.post('/api/auth/logout', json={})

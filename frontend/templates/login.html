@@ -200,11 +200,11 @@
         <form id="face-form" enctype="multipart/form-data">
           <video id="face-preview" class="camera-preview" aria-label="本机摄像头预览" autoplay muted playsinline hidden></video>
           <div class="camera-buttons">
-            <button class="action-btn" id="camera-open" type="button">打开电脑摄像头</button>
-            <button class="action-btn" id="camera-capture" type="button" hidden disabled>拍照识别</button>
+            <button class="action-btn" id="camera-open" type="button">重新开启自动识别</button>
             <button class="secondary-btn" id="camera-close" type="button" hidden>关闭摄像头</button>
           </div>
-          <p class="camera-status" id="camera-status" role="status" hidden></p>
+          <p class="camera-status" id="camera-status" role="status">正在开启摄像头…</p>
+          <div id="face-success" class="notice success" role="status" hidden></div>
           <details class="upload-options">
             <summary>从文件选择照片</summary>
             <div class="field">
@@ -213,7 +213,7 @@
             </div>
             <button class="secondary-btn" id="face-upload" type="submit">上传识别</button>
           </details>
-          <span class="hint">点击拍照时提交一张图片用于识别。当前未启用活体检测。</span>
+          <span class="hint">请正对镜头，摄像头开启后自动识别；成功后显示姓名与身份并进入系统。图片仅用于识别，不保存。当前未启用活体检测。</span>
         </form>
       {% endif %}
       <form id="password-form">
@@ -234,178 +234,6 @@
       <div id="login-message" class="notice error" role="alert" hidden></div>
     </section>
   </div>
-  <script>
-    const message = document.querySelector('#login-message');
-    function showError(error) {
-      message.textContent = error.message;
-      message.hidden = false;
-    }
-
-    async function signIn(endpoint, options) {
-      message.hidden = true;
-      try {
-        const response = await fetch(endpoint, { method: 'POST', ...options });
-        const result = await response.json();
-        if (!response.ok || !result.authorized) {
-          throw new Error(result.message || result.error || '登录失败，请检查身份或凭据。');
-        }
-        window.location.assign('/login');
-      } catch (error) {
-        showError(error);
-      }
-    }
-
-    document.querySelector('#password-form').addEventListener('submit', (event) => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      return signIn('/api/auth/password', {
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(form)),
-      });
-    });
-    async function encodeFaceImage(source, width, height) {
-      const canvas = document.createElement('canvas');
-      const scale = Math.min(1, 1280 / Math.max(width, height));
-      canvas.width = Math.max(1, Math.round(width * scale));
-      canvas.height = Math.max(1, Math.round(height * scale));
-      canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
-      const photo = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-      if (!photo || photo.size > 2 * 1024 * 1024) {
-        throw new Error('无法压缩图片，请选择较小的照片。');
-      }
-      const body = new FormData();
-      body.append('image', photo, 'face.jpg');
-      return body;
-    }
-
-    const faceForm = document.querySelector('#face-form');
-    if (faceForm) {
-      const preview = document.querySelector('#face-preview');
-      const openCamera = document.querySelector('#camera-open');
-      const capture = document.querySelector('#camera-capture');
-      const closeCamera = document.querySelector('#camera-close');
-      const upload = document.querySelector('#face-upload');
-      const status = document.querySelector('#camera-status');
-      let stream;
-      let cameraRequest = 0;
-      let submitting = false;
-
-      function setCameraStatus(text = '') {
-        status.textContent = text;
-        status.hidden = !text;
-      }
-
-      function stopCamera() {
-        cameraRequest += 1;
-        const previous = stream;
-        stream = undefined;
-        previous?.getTracks().forEach((track) => track.stop());
-        preview.srcObject = null;
-        preview.hidden = true;
-        capture.hidden = true;
-        capture.disabled = true;
-        closeCamera.hidden = true;
-        openCamera.hidden = false;
-        openCamera.disabled = submitting;
-        setCameraStatus();
-      }
-
-      openCamera.addEventListener('click', async () => {
-        message.hidden = true;
-        if (!navigator.mediaDevices?.getUserMedia) {
-          showError(new Error('请用 HTTPS 或本机 127.0.0.1 地址打开页面，以访问摄像头。'));
-          return;
-        }
-        const requestId = ++cameraRequest;
-        openCamera.disabled = true;
-        setCameraStatus('等待浏览器摄像头授权…');
-        try {
-          const videoStream = await navigator.mediaDevices.getUserMedia({
-            audio: false, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-          });
-          if (requestId !== cameraRequest) {
-            videoStream.getTracks().forEach((track) => track.stop());
-            return;
-          }
-          stream = videoStream;
-          preview.srcObject = stream;
-          preview.hidden = false;
-          closeCamera.hidden = false;
-          await preview.play();
-          if (requestId !== cameraRequest) return;
-          openCamera.hidden = true;
-          capture.hidden = false;
-          capture.disabled = false;
-          for (const track of stream.getVideoTracks()) {
-            track.addEventListener('ended', () => {
-              if (stream !== videoStream) return;
-              stopCamera();
-              showError(new Error('摄像头已断开，请重新打开。'));
-            });
-          }
-          setCameraStatus('请正对镜头，确认画面清晰后点击拍照识别。');
-        } catch (error) {
-          if (requestId !== cameraRequest) return;
-          stopCamera();
-          const reasons = {
-            NotAllowedError: '请在浏览器地址栏允许使用摄像头，然后重试。',
-            NotFoundError: '未找到可用摄像头。检查系统设置或摄像头连接后重试。',
-            NotReadableError: '无法读取摄像头。关闭可能占用摄像头的应用后重试。',
-          };
-          showError(new Error(reasons[error.name] || '摄像头开启失败，请检查浏览器和系统设置。'));
-        }
-      });
-
-      async function submitFace(makeBody, terminalId) {
-        if (submitting) return;
-        submitting = true;
-        upload.disabled = capture.disabled = openCamera.disabled = true;
-        message.hidden = true;
-        setCameraStatus('正在识别人脸…');
-        try {
-          const body = await makeBody();
-          body.append('terminal_id', terminalId);
-          await signIn('/api/auth/face/image', { body });
-        } catch (error) {
-          showError(error);
-        } finally {
-          submitting = false;
-          upload.disabled = openCamera.disabled = false;
-          capture.disabled = !stream;
-          setCameraStatus(stream ? '请正对镜头，确认画面清晰后点击拍照识别。' : '');
-        }
-      }
-
-      capture.addEventListener('click', () => {
-        if (!stream || !preview.videoWidth || !preview.videoHeight) return;
-        submitFace(() => encodeFaceImage(preview, preview.videoWidth, preview.videoHeight), 'web-camera');
-      });
-      closeCamera.addEventListener('click', stopCamera);
-      window.addEventListener('pagehide', stopCamera);
-
-      faceForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const file = event.currentTarget.elements.image.files[0];
-        if (!file) {
-          showError(new Error('请先选择一张人脸照片。'));
-          return;
-        }
-        stopCamera();
-        submitFace(async () => {
-          let bitmap;
-          try {
-            bitmap = await createImageBitmap(file);
-          } catch {
-            throw new Error('无法读取图片，请选择清晰的 JPG 或 PNG 照片。');
-          }
-          try {
-            return await encodeFaceImage(bitmap, bitmap.width, bitmap.height);
-          } finally {
-            bitmap.close();
-          }
-        }, 'web-image');
-      });
-    }
-  </script>
+  <script src="{{ url_for('static', filename='js/login.js') }}" defer></script>
 </body>
 </html>

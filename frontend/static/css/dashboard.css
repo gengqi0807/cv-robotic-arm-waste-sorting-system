@@ -78,6 +78,10 @@ a { color: inherit; text-decoration: none; }
 .nav-icon { width: 18px; color: #a7c4b6; font-size: 17px; text-align: center; }
 .rail-foot { display: flex; align-items: center; gap: 9px; margin-top: auto; padding: 0 10px; color: #9bb6a9; font-size: 11px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #79c99e; box-shadow: 0 0 0 4px rgb(121 201 158 / 13%); }
+.rail-foot:has(.account-identity) { align-items: stretch; flex-direction: column; gap: 12px; }
+.account-identity { display: grid; gap: 6px; padding: 14px 0; border-top: 1px solid rgb(255 255 255 / 15%); font-size: 13px; }
+.account-identity strong { color: white; font-size: 18px; }
+.account-verified { color: #a1e1bc; font-size: 11px; }
 
 .main-content { width: min(1420px, calc(100% - 226px)); margin-left: 226px; padding: 38px clamp(24px, 4vw, 64px) 56px; }
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
@@ -277,6 +281,11 @@ tbody tr:hover { background: #f9fbf9; }
   .rail { position: sticky; inset: 0 0 auto; width: 100%; height: auto; flex-direction: row; align-items: center; padding: 9px 12px; }
   .brand-mark { width: 36px; height: 36px; flex: 0 0 auto; margin: 0 14px 0 0; }
   .rail-label, .rail-foot { display: none; }
+  .rail { flex-wrap: wrap; }
+  .rail-nav { max-width: calc(100% - 50px); overflow-x: auto; }
+  .rail-foot:has(.account-identity) { display: flex; width: 100%; flex-direction: row; align-items: center; justify-content: space-between; padding: 6px 0 0; }
+  .account-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 0; border: 0; }
+  .account-identity strong { font-size: 14px; }
   .rail-nav { display: flex; gap: 4px; }
   .nav-link { min-height: 38px; gap: 7px; padding: 0 9px; border-left: 0; border-bottom: 2px solid transparent; font-size: 11px; }
   .nav-link.active { border-bottom-color: #ed9a5d; }

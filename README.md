@@ -38,7 +38,7 @@ python app.py
 
 前端 `.env` 使用 `BACKEND_URL=http://127.0.0.1:5002`。后端 `.env` 启用 `WEB_AUTH_REQUIRED=1`、`FACE_IMAGE_LOGIN_ENABLED=1`、`FACE_THRESHOLD=0.45`；数据库填 `web_api/backend/db/config.ini`。两份配置独立，不公开令牌、密码或特征。
 
-打开 **http://127.0.0.1:5000/login**，点击「打开电脑摄像头」，授权后拍照识别。仅拍照时上传单张 JPEG，后端内存处理、不保存照片。普通局域网 HTTP 页面通常不能访问浏览器摄像头，需 localhost/127.0.0.1 或 HTTPS。
+打开 **http://127.0.0.1:5000/login**，页面自动开启摄像头，授权后约 1 秒开始自动识别，无需手动拍照。识别请求逐次执行，每次处理完成后约 1 秒重试，30 秒未识别则停止并提供重新开启。每次上传单张 JPEG，后端内存处理、不保存照片。识别成功后显示姓名和中文身份，约 1.4 秒后跳转；登录后的页面持续显示当前姓名与身份。普通局域网 HTTP 页面通常不能访问浏览器摄像头，需 localhost/127.0.0.1 或 HTTPS。
 
 | 账号 | 角色 | 登录后页面 |
 |---|---|---|
@@ -71,7 +71,7 @@ python tools/start_video.py --pc-ip 192.168.137.101 --robot-ip 192.168.137.100
 
 ```powershell
 python -m unittest discover -s tests -v
-node --test tests/webrtc-player.test.cjs
+node --test tests/webrtc-player.test.cjs tests/login.test.cjs
 ```
 
 测试默认从相邻 RobotArm-a/web_api 导入业务源码，可用 `ROBOT_WEB_API_ROOT` 指定。普通 `python app.py` 可独立部署，仅需 Flask 和远程 API。

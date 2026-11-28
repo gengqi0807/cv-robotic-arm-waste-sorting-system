@@ -2,7 +2,7 @@
   <div class="section-heading">
     <h2 id="control-title">任务控制</h2>
     {% if g.web_context.auth_required %}
-      <span class="operator-label">{{ g.web_user.operator_id }}</span>
+      <span class="operator-label">{{ g.web_user.name or g.web_user.operator_id }} · {{ g.web_user.role_name or '操作员' }}</span>
     {% endif %}
   </div>
   <div class="workbench-setup">
