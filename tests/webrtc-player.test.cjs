@@ -23,7 +23,7 @@ function setup(fetch) {
     setTimeout: (callback, ms) => { timers.set(++timer, {callback, ms}); return timer; },
     clearTimeout: id => timers.delete(id),
   });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../static/js/webrtc-player.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../frontend/static/js/webrtc-player.js'), 'utf8'), context);
   const video = { srcObject: null };
   const player = new window.RobotWebRTCPlayer(video, (state, message) => states.push({state, message}));
   return {player, peers, timers, states};

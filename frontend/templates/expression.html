@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>表情互动设置 | 智能分拣管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <style>
+    body { background: var(--canvas); }
+    .expression-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr); gap: 18px; }
+    .panel { border: 1px solid var(--line); background: #fff; box-shadow: var(--shadow); }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+    .panel-body { padding: 18px; }
+    .setting-list { display: grid; gap: 18px; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); background: #fafcfb; }
+    .segmented-control { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid #d7e0da; }
+    .segmented-control label { position: relative; }
+    .segmented-control input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .segmented-control span { display: inline-flex; min-height: 30px; align-items: center; padding: 0 12px; font-size: 11px; cursor: pointer; color: #607069; }
+    .segmented-control input:checked + span { color: #fff; background: var(--green); }
+    .status-card { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line); background: linear-gradient(180deg, #fff 0%, #f8fbf9 100%); }
+    .status-badge { display: inline-flex; align-items: center; width: fit-content; min-height: 26px; padding: 0 10px; border: 1px solid #d7e0da; background: #eef6f1; color: #215d4d; font-size: 10px; font-weight: 700; }
+    .status-list { display: grid; gap: 0; margin: 0; }
+    .status-list div { display: grid; grid-template-columns: 122px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-top: 1px solid #edf1ee; }
+    .status-list dt { color: var(--muted); font-size: 10px; }
+    .status-list dd { margin: 0; color: #263b32; font-size: 11px; }
+    .notice { min-height: 48px; padding: 12px 14px; border-left: 3px solid #d97d3d; background: #fff6ef; color: #7a4f2b; font-size: 12px; line-height: 1.5; }
+    .notice.warning { border-left-color: #b6524b; background: #fff1f0; color: #8c3d35; }
+    .notice.success { border-left-color: #1b7d5f; background: #ebf8f0; color: #1d5b48; }
+    .error-message { margin-top: 12px; padding: 12px; color: #a9423d; background: #fff1f0; border-left: 3px solid #b6524b; }
+  </style>
+</head>
+<body data-page="expression">
+  <div class="app-shell">
+    {% set sidebar_label = "表情互动" %}
+    {% include "_sidebar.html" %}
+
+    <main class="main-content">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">表情互动 / 安全设置</p>
+          <h1>表情互动设置</h1>
+        </div>
+      </header>
+
+      <div class="expression-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>互动配置</h2>
+              <p class="muted">员工授权、开关和动作配置均在此处统一管理。</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="setting-list">
+              <div class="toggle-row">
+                <div>
+                  <strong>员工授权</strong>
+                  <p class="muted">员工是否同意启用表情互动功能</p>
+                </div>
+                <fieldset class="segmented-control" aria-label="员工授权">
+                  <label><input type="radio" name="authorized" value="1"><span>同意</span></label>
+                  <label><input type="radio" name="authorized" value="0" checked><span>不同意</span></label>
+                </fieldset>
+              </div>
+
+              <div class="toggle-row">
+                <div>
+                  <strong>互动总开关</strong>
+                  <p class="muted">开启后才允许笑脸触发预设动作</p>
+                </div>
+                <fieldset class="segmented-control" aria-label="互动总开关">
+                  <label><input type="radio" name="enabled" value="1"><span>开启</span></label>
+                  <label><input type="radio" name="enabled" value="0" checked><span>关闭</span></label>
+                </fieldset>
+              </div>
+
+              <div class="toggle-row">
+                <div>
+                  <strong>受限动作配置</strong>
+                  <p class="muted">当前动作参数将由刘天悦确认后替换</p>
+                </div>
+                <label class="filter-field" style="min-width: 200px; margin: 0;">
+                  <span>动作</span>
+                  <select id="action-id">
+                    <option value="smile_wave">smile_wave</option>
+                    <option value="smile_nod">smile_nod</option>
+                  </select>
+                </label>
+              </div>
+
+              <button class="button button-primary" id="save-config" type="button">保存配置</button>
+              <button class="button button-outline" id="simulate-trigger" type="button">模拟笑脸</button>
+              <div id="config-message" class="notice warning" hidden>笑脸识别为模拟数据，真实识别由耿绮模块提供。</div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="panel-header"><h2>状态展示</h2></div>
+          <div class="panel-body">
+            <div class="status-card">
+              <span id="status-badge" class="status-badge">已关闭</span>
+              <dl class="status-list">
+                <div><dt>可否触发</dt><dd id="trigger-available">否</dd></div>
+                <div><dt>最近触发</dt><dd id="last-trigger-time">—</dd></div>
+                <div><dt>动作</dt><dd id="last-trigger-action">—</dd></div>
+                <div><dt>状态</dt><dd id="feature-status">关闭</dd></div>
+              </dl>
+            </div>
+            <div class="notice" style="margin-top: 16px;">当前仅模拟互动并记录结果。运行、暂停或故障时由服务端判定是否允许互动。</div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const message = document.querySelector('#config-message');
+    const actions = document.querySelector('#action-id');
+
+    async function expressionRequest(route, body) {
+      const options = body ? {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      } : {};
+      const response = await fetch('/api/expression/' + route, options);
+      if (response.status === 401) window.location.assign('/login');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '操作失败。');
+      return result;
+    }
+
+    function showMessage(text) {
+      message.hidden = false;
+      message.textContent = text;
+    }
+
+    function applyConfig(config) {
+      for (const key of ['authorized', 'enabled']) {
+        const value = config[key] ? '1' : '0';
+        document.querySelector('input[name="' + key + '"][value="' + value + '"]').checked = true;
+      }
+      actions.value = config.action_id;
+      const status = !config.enabled ? '已关闭' : (config.authorized ? '已授权' : '未授权');
+      document.querySelector('#status-badge').textContent = status;
+      document.querySelector('#trigger-available').textContent = config.enabled && config.authorized ? '可模拟' : '否';
+      document.querySelector('#feature-status').textContent = status;
+    }
+
+    async function loadLog() {
+      const { items } = await expressionRequest('log');
+      const last = items.find((item) => item.result === 'success');
+      document.querySelector('#last-trigger-time').textContent =
+        last ? new Date(Number(last.triggered_at_ms)).toLocaleString('zh-CN') : '—';
+      document.querySelector('#last-trigger-action').textContent = last?.action_id || '—';
+    }
+
+    document.querySelector('#save-config').addEventListener('click', async () => {
+      try {
+        const config = await expressionRequest('config', {
+          enabled: document.querySelector('input[name="enabled"]:checked').value === '1',
+          authorized: document.querySelector('input[name="authorized"]:checked').value === '1',
+          action_id: actions.value,
+        });
+        applyConfig(config);
+        showMessage('配置已保存。');
+      } catch (error) {
+        showMessage(error.message);
+      }
+    });
+
+    document.querySelector('#simulate-trigger').addEventListener('click', async () => {
+      try {
+        const result = await expressionRequest('trigger', { detected: true, confidence: 0.95 });
+        showMessage(result.triggered ? '已记录模拟动作。' : result.result);
+        await loadLog();
+      } catch (error) {
+        showMessage(error.message);
+      }
+    });
+
+    expressionRequest('config').then(applyConfig).then(loadLog).catch((error) => showMessage(error.message));
+  </script>
+</body>
+</html>

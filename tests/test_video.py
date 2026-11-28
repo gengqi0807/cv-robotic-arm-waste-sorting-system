@@ -22,7 +22,7 @@ spec.loader.exec_module(launcher)
 
 class VideoConfigTests(unittest.TestCase):
     def test_browser_address_and_no_token_exposure(self):
-        client = create_app({'TESTING': True, 'ROBOT_BRIDGE_TOKEN': 'never-expose',
+        client = create_app({'TESTING': True, 'WEB_AUTH_REQUIRED': False, 'ROBOT_BRIDGE_TOKEN': 'never-expose',
                              'VIDEO_WEBRTC_BASE_URL': '', 'VIDEO_TRANSPORT': 'webrtc',
                              'VIDEO_STREAM_PATH': 'robot-camera'}).test_client()
         result = client.get('/api/video/config', base_url='http://192.168.137.101:5000')
@@ -34,7 +34,7 @@ class VideoConfigTests(unittest.TestCase):
         self.assertEqual(local.json['whep_url'], 'http://localhost:8889/robot-camera/whep')
 
     def test_configuration_override_and_rejection(self):
-        client = create_app({'TESTING': True, 'VIDEO_WEBRTC_BASE_URL': 'https://video.example',
+        client = create_app({'TESTING': True, 'WEB_AUTH_REQUIRED': False, 'VIDEO_WEBRTC_BASE_URL': 'https://video.example',
                              'VIDEO_STREAM_PATH': 'arm', 'VIDEO_TRANSPORT': 'jpeg'}).test_client()
         self.assertEqual(client.get('/api/video/config').json['whep_url'], 'https://video.example/arm/whep')
         client.application.config['VIDEO_WEBRTC_BASE_URL'] = 'http://user:secret@host'

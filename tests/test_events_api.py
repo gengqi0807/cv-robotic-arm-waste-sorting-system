@@ -131,7 +131,7 @@ class EventsApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.database = FakeDatabase()
         self.client = create_app(
-            {"TESTING": True, "ROBOT_BRIDGE_TOKEN": "test-token"}, self.database.connect
+            {"TESTING": True, "WEB_AUTH_REQUIRED": False, "ROBOT_BRIDGE_TOKEN": "test-token"}, self.database.connect
         ).test_client()
 
     def test_duplicate_event_id_is_idempotent(self) -> None:
@@ -207,15 +207,19 @@ class EventsApiTests(unittest.TestCase):
         self.assertIsInstance(response.json, dict)
         self.assertIn("error", response.json)
 
-    def test_task_and_monitor_pages_render(self) -> None:
+    def test_workbench_combines_camera_and_commands(self) -> None:
         task_page = self.client.get("/tasks")
         monitor_page = self.client.get("/monitor")
 
         self.assertEqual(task_page.status_code, 200)
-        self.assertIn("/api/tasks/control", task_page.get_data(as_text=True))
-        self.assertIn('value="live" checked', task_page.get_data(as_text=True))
-        self.assertEqual(monitor_page.status_code, 200)
-        self.assertIn("模拟数据", monitor_page.get_data(as_text=True))
+        html = task_page.get_data(as_text=True)
+        self.assertIn('id="camera-image"', html)
+        self.assertIn('id="start-task"', html)
+        self.assertIn('id="pause-task"', html)
+        self.assertIn('value="live" checked', html)
+        self.assertEqual(html.count('name="workbench-mode"'), 2)
+        self.assertEqual(monitor_page.status_code, 302)
+        self.assertEqual(monitor_page.location, "/tasks")
 
     def test_start_command_is_queued_for_online_robot(self) -> None:
         app = self.client.application

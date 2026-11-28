@@ -15,9 +15,9 @@ ENV/
 
 # Database configuration (keep the example template)
 db/config.ini
+backend/db/config.ini
 *.ini
 !config.example.ini
-!db/config.example.ini
 
 # Database files
 *.db
@@ -61,3 +61,10 @@ model/
 # 板子端真实连接配置（只提交 .example）
 robot_bridge.env
 arm/**/robot_bridge.env
+
+# 本地人脸数据与模型
+data/faces/*
+!data/faces/manifest.example.json
+data/faces_unknown_test/
+data/faces_unknown_calibration/
+data/faces_acceptance/

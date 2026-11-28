@@ -1,0 +1,26 @@
+{% set user = g.get('web_user') %}
+{% set unrestricted = not g.web_context.auth_required %}
+<aside class="rail">
+  <a class="brand-mark" href="{{ url_for('records_page') }}" aria-label="智能分拣管理首页">分</a>
+  <div class="rail-label">管理台</div>
+  <nav class="rail-nav" aria-label="主导航">
+    {% for endpoint, icon, label, roles, core in navigation %}
+      {% set monitor_is_alias = endpoint == 'monitor_page' and (unrestricted or user and user.role == 'operator') %}
+      {% if not monitor_is_alias and ((core and unrestricted) or (user and user.role in roles)) %}
+        <a class="nav-link{% if request.endpoint == endpoint %} active{% endif %}" href="{{ url_for(endpoint) }}"{% if request.endpoint == endpoint %} aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">{{ icon }}</span><span>{{ label }}</span>
+        </a>
+      {% endif %}
+    {% endfor %}
+    {% if not user %}
+      <a class="nav-link" href="{{ url_for('login_page') }}">登录</a>
+    {% endif %}
+  </nav>
+  {% if user %}
+    <form class="rail-foot" method="post" action="{{ url_for('forward_api', api_path='auth/logout') }}">
+      <button class="button button-outline" type="submit">退出登录</button>
+    </form>
+  {% else %}
+    <div class="rail-foot"><span class="status-dot"></span>{{ sidebar_label }}</div>
+  {% endif %}
+</aside>

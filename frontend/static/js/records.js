@@ -225,7 +225,7 @@ elements.previous.addEventListener("click", () => {
 elements.next.addEventListener("click", () => {
   if (state.page < state.totalPages) { state.page += 1; loadRecords(); }
 });
-document.querySelector("#export-csv").addEventListener("click", () => {
+document.querySelector("#export-csv")?.addEventListener("click", () => {
   window.location.assign(`/api/events/export?${currentFilters().toString()}`);
 });
 document.querySelector("#close-dialog").addEventListener("click", () => elements.dialog.close());

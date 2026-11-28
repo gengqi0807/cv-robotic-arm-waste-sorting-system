@@ -1,5 +1,7 @@
 # MediaMTX + FFmpeg + WebRTC 视频通道
 
+2026-11-28：电脑 app.py 只启动页面与 API 转发，先在 RobotArm-a/web_api 启动 run_backend.py（API 5002）；电脑 BACKEND_URL 指向该 API。设备 MJPEG 仍为 5001。登录摄像头与任务视频独立。
+
 ## 实现方式
 
 ```text

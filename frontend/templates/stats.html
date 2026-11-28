@@ -10,25 +10,8 @@
 </head>
 <body data-page="stats">
   <div class="app-shell">
-    <aside class="rail">
-      <a class="brand-mark" href="{{ url_for('records_page') }}" aria-label="智能分拣管理首页">分</a>
-      <div class="rail-label">管理台</div>
-      <nav class="rail-nav" aria-label="主导航">
-        <a class="nav-link" href="{{ url_for('records_page') }}">
-          <span class="nav-icon" aria-hidden="true">▤</span><span>记录查询</span>
-        </a>
-        <a class="nav-link active" href="{{ url_for('stats_page') }}" aria-current="page">
-          <span class="nav-icon" aria-hidden="true">▥</span><span>运营统计</span>
-        </a>
-        <a class="nav-link" href="{{ url_for('tasks_page') }}">
-          <span class="nav-icon" aria-hidden="true">▷</span><span>任务操作</span>
-        </a>
-        <a class="nav-link" href="{{ url_for('monitor_page') }}">
-          <span class="nav-icon" aria-hidden="true">◎</span><span>实时监控</span>
-        </a>
-      </nav>
-      <div class="rail-foot"><span class="status-dot"></span>系统记录</div>
-    </aside>
+    {% set sidebar_label = "运营统计" %}
+    {% include "_sidebar.html" %}
 
     <main class="main-content">
       <header class="page-header">
