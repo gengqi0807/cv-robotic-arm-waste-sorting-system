@@ -13,6 +13,7 @@ import os
 import urllib.request
 import urllib.error
 import numpy as np
+from video_source import VideoSource, LatestCamera
 
 # 本地 Web 前端（零依赖，备用）
 from web_server import SharedState, start_web_server
@@ -182,11 +183,15 @@ def main():
         elif state is not None:
             state.set_status(**kw)
 
+    video_source = VideoSource.from_env(bridge.token) if bridge is not None else None
+
     def push_frame(frame_out):
         # 注意：frame_out 是 numpy 图像（原始帧），不是已编码的 bytes。
         #   联调模式：robot_bridge.upload_frame 内部自己 cv2.imencode，必须传 numpy。
         #   本地模式：SharedState 存的是 bytes，这里自己编码。
-        if bridge is not None:
+        if video_source is not None:
+            return  # The capture thread streams raw frames independently.
+        elif bridge is not None:
             bridge.upload_frame(frame_out, "frame_%d" % int(time.time() * 1000))
         elif state is not None:
             ok, jpeg = cv2.imencode(".jpg", frame_out, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
@@ -413,6 +418,8 @@ def main():
         garbage_robot.garbage_grap(msg, xy)
 
     if capture.isOpened():
+        if video_source is not None:
+            capture = LatestCamera(capture, video_source)
         while rclpy.ok():
             # ---- 每 10 帧轮询一次前端命令（start/pause/resume/finish/action）----
             _poll_counter += 1
@@ -513,7 +520,7 @@ def main():
                 _fps = _fps_n / _el
                 _fps_t0 = time.time()
                 _fps_n = 0
-            if frame_count % 3 == 0:
+            if video_source is not None or frame_count % 3 == 0:
                 push_frame(frame_out)
 
             # 可视化显示（无显示器时自动跳过，不影响运行）
@@ -583,6 +590,8 @@ def main():
         print("Camera Open Failed!")
 
     capture.release()
+    if video_source is not None:
+        video_source.close()
     cv2.destroyAllWindows()
 
     # ====== 新增：退出时清理后台进程 ======

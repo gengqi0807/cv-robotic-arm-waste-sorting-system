@@ -27,6 +27,7 @@ db/config.ini
 # Logs
 *.log
 logs/
+runtime/
 
 # IDE files
 .idea/

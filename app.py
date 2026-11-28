@@ -277,6 +277,29 @@ def create_app(
     def monitor_page() -> str:
         return render_template("monitor.html")
 
+    @app.get("/api/video/config")
+    def video_config() -> Any:
+        # The page host is the address actually reachable by this browser.
+        # Never expose bridge credentials to the browser.
+        from urllib.parse import urlsplit, urlunsplit
+        hostname = urlsplit(request.host_url).hostname
+        authority = f'[{hostname}]' if ':' in hostname else hostname
+        base = app.config.get('VIDEO_WEBRTC_BASE_URL', os.environ.get('VIDEO_WEBRTC_BASE_URL', ''))
+        base = base.strip().rstrip('/') or f'{request.scheme}://{authority}:8889'
+        parsed = urlsplit(base)
+        if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.username or parsed.password:
+            return jsonify({'error': '视频服务地址配置无效。'}), 503
+        stream = app.config.get('VIDEO_STREAM_PATH', os.environ.get('VIDEO_STREAM_PATH', 'robot-camera'))
+        if not isinstance(stream, str) or not stream or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in stream):
+            return jsonify({'error': '视频流名称配置无效。'}), 503
+        transport = app.config.get('VIDEO_TRANSPORT', os.environ.get('VIDEO_TRANSPORT', 'webrtc'))
+        if transport not in ('webrtc', 'jpeg'):
+            return jsonify({'error': 'VIDEO_TRANSPORT 必须为 webrtc 或 jpeg。'}), 503
+        whep = urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip('/') + '/' + stream + '/whep', '', ''))
+        response = jsonify({'transport': transport, 'whep_url': whep, 'jpeg_url': '/api/robot/frame'})
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
     @app.post("/api/tasks/control")
     def control_task() -> tuple[Any, int] | Any:
         origin_error = require_same_origin()

@@ -28,6 +28,9 @@ const elements = {
   wsState: document.querySelector("#monitor-ws-state"),
   imageUrl: document.querySelector("#monitor-image-url"),
   image: document.querySelector("#camera-image"),
+  video: document.querySelector("#camera-video"),
+  videoStatus: document.querySelector("#video-status"),
+  transport: document.querySelector("#video-transport"),
   scene: document.querySelector("#camera-scene"),
   cameraCaption: document.querySelector("#camera-caption"),
   cameraSource: document.querySelector("#camera-source"),
@@ -51,6 +54,68 @@ let monitorSocket = null;
 let monitorPollTimer = null;
 let framePollTimer = null;
 let demoFrame = 1;
+let videoGeneration = 0;
+let videoConfig = null;
+let frameRequest = null;
+const videoPlayer = new RobotWebRTCPlayer(elements.video, (state, message) => {
+  if (monitorMode !== "live") return;
+  elements.videoStatus.hidden = state === "playing";
+  elements.videoStatus.textContent = message;
+  elements.cameraLiveLabel.textContent = state === "playing" ? "实时视频" : "视频连接中";
+  elements.cameraTimestamp.textContent = state === "playing" ? "WebRTC 连续视频" : "—";
+  elements.frameId.textContent = "—";
+});
+
+function stopVideo() {
+  videoGeneration += 1;
+  if (framePollTimer) clearInterval(framePollTimer);
+  framePollTimer = null;
+  if (frameRequest) frameRequest.abort();
+  frameRequest = null;
+  videoPlayer.stop();
+  const previous = elements.image.dataset.objectUrl;
+  if (previous) URL.revokeObjectURL(previous);
+  delete elements.image.dataset.objectUrl;
+  elements.image.removeAttribute("src");
+  elements.image.hidden = true;
+  elements.video.hidden = true;
+  elements.videoStatus.hidden = true;
+}
+
+async function startVideo(useSelected = false) {
+  stopVideo();
+  const generation = videoGeneration;
+  if (monitorMode !== "live") return;
+  elements.scene.hidden = true;
+  elements.videoStatus.hidden = false;
+  elements.videoStatus.textContent = "正在读取视频配置…";
+  try {
+    const response = await fetch("/api/video/config", { cache: "no-store" });
+    const config = await response.json();
+    if (!response.ok) throw new Error(config.error || "视频配置读取失败");
+    if (generation !== videoGeneration || monitorMode !== "live") return;
+    videoConfig = config;
+    if (!useSelected) elements.transport.value = config.transport;
+    if (elements.transport.value === "webrtc") {
+      elements.video.hidden = false;
+      elements.cameraSource.textContent = "实时视频";
+      elements.cameraSourceDetail.textContent = "MediaMTX / WebRTC";
+      elements.cameraCaption.textContent = "机械臂相机 · 连续视频";
+      videoPlayer.start(config.whep_url);
+    } else {
+      elements.videoStatus.textContent = "等待设备上传 JPEG 画面（设备需启用兼容模式）…";
+      const poll = () => pollRobotFrame().catch(error => {
+        if (generation !== videoGeneration) return;
+        elements.videoStatus.hidden = false;
+        elements.videoStatus.textContent = error.message;
+      });
+      poll();
+      framePollTimer = setInterval(poll, 500);
+    }
+  } catch (error) {
+    if (generation === videoGeneration) elements.videoStatus.textContent = error.message;
+  }
+}
 
 function localTime(timestampMs = Date.now()) {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -183,7 +248,7 @@ function clearLiveData() {
   elements.motionSource.textContent = "暂无执行数据";
   elements.cameraLiveLabel.textContent = "无视频流";
   elements.cameraSource.textContent = "无相机视频";
-  elements.cameraSourceDetail.textContent = "等待机械臂上传 JPEG 帧";
+  elements.cameraSourceDetail.textContent = "等待连接视频通道";
   elements.cameraCaption.textContent = "连接后显示机械臂端实时上传画面";
 }
 
@@ -203,17 +268,24 @@ async function pollMonitorState() {
 }
 
 async function pollRobotFrame() {
-  if (monitorMode !== "live") return;
-  const response = await fetch(`/api/robot/frame?t=${Date.now()}`, { cache: "no-store" });
+  if (monitorMode !== "live" || elements.transport.value !== "jpeg" || frameRequest) return;
+  const generation = videoGeneration;
+  const controller = new AbortController();
+  frameRequest = controller;
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+  const response = await fetch(`${videoConfig?.jpeg_url || "/api/robot/frame"}?t=${Date.now()}`, { cache: "no-store", signal: controller.signal });
   if (response.status === 204) return;
   if (!response.ok) throw new Error(`视频帧读取失败（HTTP ${response.status}）`);
   const blob = await response.blob();
+  if (generation !== videoGeneration || monitorMode !== "live") return;
   const objectUrl = URL.createObjectURL(blob);
   const previousUrl = elements.image.dataset.objectUrl;
   elements.image.src = objectUrl;
   elements.image.dataset.objectUrl = objectUrl;
   elements.image.hidden = false;
   elements.scene.hidden = true;
+  elements.videoStatus.hidden = true;
   if (previousUrl) URL.revokeObjectURL(previousUrl);
   elements.cameraLiveLabel.textContent = "实时画面";
   elements.cameraSource.textContent = "机械臂相机";
@@ -221,6 +293,10 @@ async function pollRobotFrame() {
   elements.cameraCaption.textContent = "机械臂端实时上传画面";
   elements.cameraTimestamp.textContent = localTime(response.headers.get("X-Frame-Timestamp-Ms") || Date.now());
   elements.frameId.textContent = response.headers.get("X-Frame-Id") || "—";
+  } finally {
+    clearTimeout(timeout);
+    if (frameRequest === controller) frameRequest = null;
+  }
 }
 
 function connectSocket() {
@@ -253,6 +329,7 @@ function connectSocket() {
 function loadImage() {
   const address = elements.imageUrl.value.trim();
   if (!address) return;
+  stopVideo();
   elements.image.hidden = false;
   elements.scene.hidden = true;
   elements.image.src = address;
@@ -277,15 +354,14 @@ document.querySelectorAll('input[name="monitor-mode"]').forEach((input) => {
     elements.modePill.textContent = live ? "接口联调" : "模拟数据";
     elements.modePill.classList.toggle("live", live);
     elements.modeDescription.textContent = live
-      ? "通过 HTTP 轮询机械臂状态，并读取机械臂端上传的最新 JPEG 帧。"
+      ? "实时视频与任务状态独立连接，视频故障不影响控制指令。"
       : "画面、识别、坐标和执行状态均为本地演示值。";
     elements.connection.hidden = !live;
     if (live) {
       clearLiveData();
       pollMonitorState();
-      pollRobotFrame().catch((error) => { elements.error.textContent = `视频帧读取失败：${error.message}`; elements.error.hidden = false; });
+      startVideo();
       if (!monitorPollTimer) monitorPollTimer = window.setInterval(pollMonitorState, 1000);
-      if (!framePollTimer) framePollTimer = window.setInterval(() => pollRobotFrame().catch(() => {}), 500);
     } else if (monitorPollTimer) {
       window.clearInterval(monitorPollTimer);
       monitorPollTimer = null;
@@ -295,6 +371,7 @@ document.querySelectorAll('input[name="monitor-mode"]').forEach((input) => {
       framePollTimer = null;
     }
     if (!live) {
+      stopVideo();
       if (monitorSocket) monitorSocket.close();
       monitorSocket = null;
       elements.wsState.textContent = "未连接";
@@ -307,6 +384,9 @@ document.querySelectorAll('input[name="monitor-mode"]').forEach((input) => {
 });
 document.querySelector("#connect-monitor").addEventListener("click", connectSocket);
 document.querySelector("#load-monitor-image").addEventListener("click", loadImage);
+document.querySelector("#reconnect-video").addEventListener("click", () => startVideo(true));
+elements.transport.addEventListener("change", () => startVideo(true));
+window.addEventListener("pagehide", stopVideo);
 updateRobotState({ robot_state: "running", message: "模拟分拣流程运行中。", recoverable: true, timestamp_ms: Date.now() });
 mockTick();
 window.setInterval(mockTick, 3000);

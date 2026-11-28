@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#f4f6f3">
   <title>实时监控 | 智能分拣管理</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/webrtc-player.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/monitor.js') }}" defer></script>
 </head>
 <body data-page="monitor">
@@ -43,6 +44,8 @@
         <span id="monitor-ws-state" class="muted">未连接</span>
         <label class="filter-field image-url-field"><span>最近图片地址（可选）</span><input id="monitor-image-url" type="url" placeholder="http(s)://…/latest.jpg" spellcheck="false"></label>
         <button class="button button-quiet" id="load-monitor-image" type="button">加载图片</button>
+        <label class="filter-field"><span>视频通道</span><select id="video-transport"><option value="webrtc">低延迟视频</option><option value="jpeg">JPEG 兼容模式</option></select></label>
+        <button class="button button-outline" id="reconnect-video" type="button">重连视频</button>
       </section>
 
       <div class="monitor-grid">
@@ -62,6 +65,8 @@
               <div class="scene-coordinate" id="scene-coordinate">u: 320 px&nbsp;&nbsp; v: 240 px</div>
             </div>
             <img id="camera-image" alt="最近相机画面" hidden>
+            <video id="camera-video" autoplay muted playsinline controls hidden aria-label="机械臂实时视频"></video>
+            <p id="video-status" class="video-status" role="status" hidden></p>
             <div class="camera-footer"><span>画面来源：<b id="camera-source-detail">CSS 模拟场景</b></span><span id="frame-id">frame_demo_001</span></div>
           </div>
         </section>
@@ -105,7 +110,7 @@
 
       <section class="contract-note">
         <strong>接口状态</strong>
-        <span>接口联调模式通过 <code>GET /api/tasks/state</code> 轮询机械臂状态，并通过 <code>GET /api/robot/frame</code> 显示机械臂端上传的最新 JPEG 帧。</span>
+        <span>任务状态与视频独立连接；低延迟视频断开时可点击重连，或在设备端启用 JPEG 兼容模式后切换画面通道。</span>
       </section>
     </main>
   </div>

@@ -248,7 +248,8 @@ tbody tr:hover { background: #f9fbf9; }
 .scene-object span { width: 70%; height: 2px; transform: rotate(25deg); background: rgb(255 235 211 / 40%); }
 .scene-crosshair { position: absolute; top: 52%; left: 52%; color: white; font-size: 18px; text-shadow: 0 1px 4px #000; }
 .scene-coordinate { position: absolute; right: 10px; bottom: 34px; color: #eff5ef; font-family: Consolas, monospace; font-size: 9px; text-shadow: 0 1px 3px #000; }
-#camera-image { display: block; width: 100%; max-height: 520px; aspect-ratio: 4 / 3; object-fit: contain; background: #14251f; }
+#camera-image, #camera-video { display: block; width: 100%; max-height: 520px; aspect-ratio: 4 / 3; object-fit: contain; background: #14251f; }
+.video-status { min-height: 80px; margin: 0; padding: 38px 20px; color: #e0ede5; }
 .robot-state-section, .vision-section, .motion-section { min-width: 0; }
 .status-list-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
 .status-list-wide > div { grid-template-columns: 1fr; gap: 5px; min-width: 0; }

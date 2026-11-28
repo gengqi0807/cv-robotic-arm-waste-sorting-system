@@ -203,3 +203,6 @@ python -m unittest discover -s tests -v
 - 语音识别准确率约 70~80%（模型限制），且需要能录音的 4 段（TRRS）耳麦。
 - 摄像头与 USB 声卡共用 USB 供电，同时插入容易掉线，建议用带电源的 HUB。
 - 叠罗汉 / 积木搬运工完全依赖 `arm/arm_basic/stack_poses.json` 的示教点，换机械臂或换积木摆位必须重新示教。
+# MediaMTX低延迟视频
+
+已增加电脑FFmpeg编码、MediaMTX转发和浏览器WebRTC播放。启动、设备同步及JPEG回退步骤见 [视频接入说明](docs/MediaMTX视频接入.md)。默认从`D:\tool\mediamtx`与`D:\tool\ffmpeg`定位工具；视频服务需要单独运行`python tools/start_video.py`。本次未进行真实流媒体联调或延迟测量。
